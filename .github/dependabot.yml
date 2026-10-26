@@ -1,0 +1,8 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  # Add `maven` (directory /backend) in P1.1 and `npm` (directory /frontend) in P1.6,
+  # once those directories exist; Dependabot errors on missing directories.

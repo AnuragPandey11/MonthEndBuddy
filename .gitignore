@@ -1,0 +1,26 @@
+# Secrets: only the placeholder template is committed
+.env
+.env.*
+!.env.example
+
+# Backend (Maven)
+backend/target/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# Logs
+*.log
+
+# OS / editors
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Claude Code per-user settings
+.claude/settings.local.json
