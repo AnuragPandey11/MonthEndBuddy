@@ -1,0 +1,118 @@
+spring:
+  application:
+    name: monthendbuddy
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/monthendbuddy}
+    username: ${DB_USERNAME:monthendbuddy}
+    password: ${DB_PASSWORD:monthendbuddy}
+  jpa:
+    # Schema is owned by Flyway; Hibernate only checks it (architecture §7.2).
+    hibernate:
+      ddl-auto: validate
+    # Services own transaction boundaries; no lazy loading in the web layer.
+    open-in-view: false
+    properties:
+      # Batched inserts for imports and demo seeding (application-assigned UUIDs allow batching).
+      hibernate.jdbc.batch_size: 500
+      hibernate.order_inserts: true
+  flyway:
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      # CSV statements: 5 MB per file (architecture §8.2); larger uploads get 413.
+      max-file-size: 5MB
+      max-request-size: 6MB
+  ai:
+    # Groq's OpenAI-compatible API (ADR 0001). An empty key keeps the app running; the copilot reports
+    # PROVIDER_UNAVAILABLE. Retries, timeouts and tool execution are handled by SpringAiLlmGateway.
+    openai:
+      api-key: ${GROQ_API_KEY:}
+      base-url: ${AI_BASE_URL:https://api.groq.com/openai/v1}
+      chat:
+        options:
+          model: ${AI_MODEL:openai/gpt-oss-120b}
+          temperature: 0.2
+  web:
+    resources:
+      # The API serves no static files (nginx serves the SPA). Without static mappings, unknown paths raise
+      # NoHandlerFoundException, which GlobalExceptionHandler turns into a full problem (code + traceId).
+      add-mappings: false
+
+server:
+  port: 8081
+  # Trust X-Forwarded-For only from internal proxies (nginx in Compose), so rate limits see the real client IP.
+  forward-headers-strategy: native
+  tomcat:
+    # Read the rest of an oversized upload so the client receives the 413 problem instead of a dropped connection.
+    max-swallow-size: 10MB
+
+management:
+  # Actuator runs on its own port, which nginx does not proxy (architecture §3).
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+logging:
+  structured:
+    format:
+      console: ecs
+
+meb:
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    access-token-ttl: 15m
+    refresh-token-ttl: 14d
+    allowed-origins: ${APP_BASE_URL:http://localhost:8080}
+    refresh-cookie-secure: true
+  events:
+    mode: ${MEB_EVENTS_MODE:in-process}
+  cache:
+    enabled: ${MEB_CACHE_ENABLED:false}
+  agent:
+    # groq = the real provider; scripted = canned replies (tests and the offline demo).
+    provider: ${MEB_AGENT_PROVIDER:groq}
+    max-tool-iterations: 6
+    max-tool-calls-per-turn: 8
+    model-timeout: 20s
+    turn-timeout: 45s
+    history-turns: 10
+    tool-result-max-rows: 50
+  ratelimit:
+    mode: ${MEB_RATELIMIT_MODE:in-memory}
+    # Architecture §11.2. Every limit in a bucket must hold.
+    limits:
+      login:
+        - { capacity: 5, period: 1m }
+        - { capacity: 20, period: 1h }
+      register:
+        - { capacity: 3, period: 1h }
+      demo-login:
+        - { capacity: 30, period: 1h }
+      agent-chat:
+        - { capacity: 10, period: 1m }
+        - { capacity: 200, period: 1d }
+      # Shared across all users: model calls per minute, and tokens per minute below Groq's free-tier 8,000 TPM
+      # for gpt-oss-120b (ADR 0001).
+      provider-global:
+        - { capacity: 30, period: 1m }
+      provider-tokens:
+        - { capacity: 6000, period: 1m }
+      csv-import:
+        - { capacity: 10, period: 1h }
+
+# OpenAPI and Swagger UI are enabled only in the local profile (architecture §13.1).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

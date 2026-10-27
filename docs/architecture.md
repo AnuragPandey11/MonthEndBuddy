@@ -131,13 +131,14 @@ flowchart TB
 
 | Module | Owns (tables) | Public API (used by other modules) | Depends on |
 |---|---|---|---|
-| `identity` | users, user_settings, refresh_tokens | `CurrentUser`, `UserSettingsQuery` | common |
+| `identity` | users, user_settings, refresh_tokens | `CurrentUser`, `UserSettingsQuery`, `UserSavingsCommands` | common |
 | `transactions` | transactions, categories, category_rules, import_jobs, import_rows | `TransactionQueries`, `TransactionAggregations`, `CategoryQueries` | identity, common |
 | `budgets` | budgets, budget_threshold_events | `BudgetStatusService` | transactions, identity |
-| `goals` | savings_goals | `GoalService`, `SavingsProjectionService` | identity |
-| `analytics` | anomaly_alerts | `SummaryService`, `ComparisonService`, `AffordabilityService`, `AnomalyService` | transactions, budgets, goals, identity |
+| `goals` | savings_goals | `GoalService`, `GoalCommands`, `SavingsProjectionService` | identity |
+| `analytics` | anomaly_alerts, month_reviews | `SummaryService`, `ComparisonService`, `AffordabilityService`, `AnomalyService`, `MonthReviewService` | transactions, budgets, goals, identity |
 | `agent` | agent_conversations, agent_messages | REST only (nothing depends on `agent`) | analytics, budgets, goals, transactions (read) |
 | `notifications` | notifications | `NotificationService` | identity; `events` packages of transactions, budgets, analytics |
+| `demo` | — (writes through other modules' APIs) | none (nothing depends on `demo`) | identity (`DemoAccounts`), transactions (`TransactionSeeder`, `CategoryQueries`), budgets (`BudgetCommands`), goals (`GoalCommands`) |
 | `common` | outbox_events, processed_events | `Money`, `Period`, `EventPublisher`, error model, clock | — |
 
 ```mermaid
@@ -508,7 +509,7 @@ All aggregates are single SQL statements (`GROUP BY category_id`, `date_trunc('m
 
 ### 9.3 Goals and what-if
 
-- Stored goals are updated manually (`current_amount`). A contributions ledger is deferred.
+- Stored goals are updated manually (`current_amount`), or by a month-end review (§9.6), which adds to it. A contributions ledger is still deferred.
 - `POST /goals/{id}/projection` and `POST /goals/projection` (an unsaved goal) run `SavingsProjectionService` with optional overrides (`monthlyContribution`, `targetDate`). The service returns the required contribution, the projected completion month, a month-by-month series for charting, and an `assumptions[]` list (for example `"0% return"` or `"contribution constant"`). It persists nothing.
 
 ### 9.4 Purchase affordability (`AffordabilityService`)
@@ -520,14 +521,16 @@ Derived by the backend, never supplied by the model:
 | Input | Source | Label |
 |---|---|---|
 | Avg monthly income / expenses | Last 3 complete months | `DERIVED` |
-| Current savings | `user_settings.current_savings` | `USER_PROFILE`; missing → `MISSING_INPUT` |
+| Current savings | `user_settings.current_savings`: the user's **total**, goal money included | `USER_PROFILE`; missing → `MISSING_INPUT` |
+| Savings set aside | Σ `current_amount` of **all** active goals, whatever `goalIds` selects (money saved toward any goal is earmarked); achieved and archived goals are not counted | `DERIVED`; more than the savings → `GOALS_EXCEED_SAVINGS` |
 | Emergency buffer | `emergency_buffer_months × avg expenses` | `DEFAULT_ASSUMPTION` |
 | Goal requirements | Σ required monthly contribution of selected goals | `DERIVED` |
 
 Verdict logic:
 
 ```text
-savingsAfter      = currentSavings − purchaseAmount
+available         = currentSavings − savingsSetAside      (also when the user states a savings figure: it is a total too)
+savingsAfter      = available − purchaseAmount
 surplus           = avgIncome − avgExpenses
 goalNeed          = Σ requiredMonthlyContribution(goals)
 recoveryMonths    = purchaseAmount ÷ (surplus − goalNeed)   if surplus − goalNeed > 0, else NEVER
@@ -550,9 +553,29 @@ The response includes every input, its label, the verdict, the impact on each go
 
 - Rules are pure functions over `(transaction, baselineStats, settings)` and are evaluated by `AnomalyService`. In Phase 5 that runs in a consumer; before Phase 5, in an in-process after-commit handler.
 - Alerts are deduplicated by the unique index. When a user marks an alert `EXPECTED`, it is suppressed and the same rule does not re-fire for that subject and period.
+- **Refinements found by running the rules on realistic data (implementation plan P2.8):**
+  - **Routine payments are exempt** from `LARGE_VS_CATEGORY` and `ABSOLUTE_THRESHOLD`. A routine payment is one where the same merchant (or description) was paid at least 50% of the amount within the 90-day window. Without this, rent at the threshold, Netflix in a Subscriptions category dominated by cheaper plans, and fuel in a Transport category of cab rides alert every month.
+  - **One explanation per transaction.** When `LARGE_VS_CATEGORY` fires, the `ABSOLUTE_THRESHOLD` alert for the same transaction is not raised.
+  - **Only the last 12 months are evaluated.** Expenses older than that are skipped.
+  - **The baseline counts months, not zeros.** A `CATEGORY_SPIKE` baseline averages only months in which the user has any transactions, because missing data is not zero spending.
 - The UI and the agent render the explanation from the payload ("₹8,400 at X is 4.2× your typical Dining transaction of ₹2,000, based on 14 transactions in the last 90 days"). They never invent a reason.
 
 ---
+
+
+### 9.6 Month-end review (`MonthReviewService`)
+
+The app tracks money; it never moves it. What a month kept (its net cash flow) does not reach Savings today or any goal by itself. The month-end review offers it once, after the month ends, and nothing changes until the user confirms.
+
+- **When it is due.** `GET /month-review` describes last month in the user's timezone (via `Clock`): `kept` is that month's `net` from `SummaryService`, so the browser never computes it. The status is `DUE` when the month has transactions, ended in surplus and has no review yet, `NOTHING_KEPT` when it has no transactions or no surplus, and `DONE` or `SKIPPED` once it has been reviewed.
+- **What confirming does.** `POST /month-review` takes `month` (only last month is accepted), an optional `addToSavings` and up to 10 `goalContributions[{goalId, amount}]`. With neither, the month is recorded as `SKIPPED`. The amounts are the user's choice and are not capped at what the month kept.
+  - Adding to savings needs a known balance. When Savings today is unset the request is rejected (422 `addToSavings`), because adding to nothing would invent a bank balance.
+  - When Savings today was changed after the month ended, in the user's timezone, the view sets `savingsUpdatedSinceMonthEnd`. The card then starts with "add to savings" unticked and says when it was updated, so the same money is not counted twice.
+  - Goal contributions go to active goals through `GoalCommands.contribute`, and a goal that reaches its target becomes `ACHIEVED`. Setting money aside earmarks part of Savings today; it does not reduce it (§9.4).
+  - A goal ID that is missing, archived or another user's is rejected with the same field error (422 `goalContributions[i].goalId`), like a foreign category in a transaction body.
+- **Once, all or nothing.** The `month_reviews` row is inserted first, in the same transaction as the savings and goal updates, under a unique `(user_id, month_start)` index. A second confirmation, including a concurrent one, is 409 `month_already_reviewed`, and any failure rolls everything back.
+- **Where it lives.** It is in `analytics`, which already reads `identity` and `goals`; `goals` cannot depend on `analytics` without a cycle. It writes only through the other modules' public APIs: `identity.UserSavingsCommands` and `goals.GoalCommands`. The demo reset clears the demo user's reviews (`DemoDataReset`).
+- **Not a tool.** The copilot does not offer or confirm reviews: writes stay with the user (D3).
 
 ## 10. AI agent design
 
@@ -722,6 +745,13 @@ Defence does not rely on the prompt alone:
 
 - **Phase 3:** plain request/response (`Accept: application/json`).
 - **Phase 4:** the same endpoint also streams Server-Sent Events when called with `Accept: text/event-stream`. Event types are `tool_started`, `tool_finished`, `final`, and `error`. The frontend reads the stream with `fetch` and `ReadableStream`, because `EventSource` cannot send POST requests. Internally the orchestrator writes to an `AgentEventSink`, so both transports share one code path.
+- **Stream contract (decided in P4.1):**
+  - `tool_started {callId, tool, label}` and `tool_finished {callId, tool, ok, millis}` arrive in the order the tools ran.
+  - Every stream ends with exactly one terminal event. `final` carries the same `AgentResponse` as the JSON transport, for every status including `PROVIDER_UNAVAILABLE`. `error {code, message, traceId}` is sent only when the turn threw and there is no response.
+  - Admission (rate limit, conversation ownership, the turn lock) runs before the stream opens, so a 404, 409, 422 or 429 is still an ordinary `ProblemDetail`. The client sends `Accept: text/event-stream, application/problem+json` and branches on the status.
+  - **A client disconnect does not cancel the turn.** The turn finishes and is persisted, so reopening the conversation shows the answer; sends after the disconnect are dropped. The turn lock is released when the turn ends, not when the client leaves.
+  - Streamed turns run on virtual threads, at most 64 at once (over that: 503 `provider_unavailable`). The emitter times out after 90 s, the lock TTL. The response sets `X-Accel-Buffering: no`, and nginx's chat location turns proxy buffering off with a 120 s read timeout.
+  - Completing the stream re-dispatches the request (`DispatcherType.ASYNC`). Spring Security permits that dispatch, because the original request was already authorized and the bearer filter does not run again.
 
 ### 10.8 Failure handling
 
@@ -938,9 +968,10 @@ frontend/src/
   - Disposes GL resources on unmount.
   - Falls back to a static CSS gradient when `prefers-reduced-motion` is set, WebGL is unavailable, or the frame rate stays below 30 fps for 2 s.
   - Text never sits directly on the shader.
-- **Motion.**
+- **Motion** (the `motion` package, imported from `motion/react`).
   - A global `<MotionConfig reducedMotion="user">`.
-  - Shared duration and easing tokens.
+  - Shared duration and easing tokens in `lib/motion.ts`.
+  - Chart marks grow in as transforms (`scaleX`/`scaleY`), so reduced motion shows them in place; non-transform animations (an SVG `pathLength`, Recharts) check `useReducedMotion()` themselves.
   - Financial figures are never count-up animated.
 
 ---
@@ -1048,6 +1079,8 @@ Compose profile `core` is sufficient through Phase 4; `full` from Phase 5.
 - **Anomaly rules start in Phase 2** and run in-process. The spec places them in Phase 5; this design only moves their *transport* to Kafka in Phase 5.
 - **`POST /transactions/import` becomes the `/imports` resource**, which supports the two-step validate → commit flow.
 - **Additional endpoints:** refresh, logout, demo login, categories, alerts, and full update/delete for budgets and goals.
+- **The greeting shows today's date, not a selected date range (P4.2, moved in P4.3).** Spec §7 asks for "greeting and selected date range". Each page owns its own month picker, because the dashboard, budgets and transactions filter differently, so there is no single range to show. The overview's header shows a time-of-day greeting and today's date in the user's timezone instead.
+- **Top navigation instead of a sidebar (P4.3).** The owner chose a light bento reference design: the main navigation is a row of pills in the top bar from `lg` up, with the bottom bar below that. Light is the default theme and dark is a toggle in the top bar, remembered per browser.
 
 ### Additions to `.env.example`
 

@@ -140,7 +140,7 @@ If PRs merge in a different order, renumber the files before merging. By default
 - The product is **MonthEndBuddy** (A§19). The spec was renamed from `FinPilot_AI_Project_Specification.md` to `MonthEndBuddy_Project_Specification.md`, and the references in `architecture.md`, this plan and `CLAUDE.md` were updated.
 - **Done when** a single product name is used everywhere.
 
-### P0.2 Repository bootstrap · S · 🟡 local files done 2026-10-26; GitHub repo and first commit pending
+### P0.2 Repository bootstrap · S · ✅ done 2026-10-26 (first commit `659fb5f`; secrets-scan green)
 
 - Run `git init`, create the GitHub repository and protect `main`.
 - Add `.gitignore` covering `.env`, `build/`, `node_modules/`, `.DS_Store` and IDE files, and delete the existing `.DS_Store`.
@@ -181,7 +181,7 @@ flowchart LR
     P16 --> P17
 ```
 
-### P1.1 Backend scaffold · M
+### P1.1 Backend scaffold · M · ✅ done 2026-10-26
 
 - Create the Maven project with its wrapper and version properties (I1, I2), with `<release>21</release>` so that it builds on a newer local JDK. Add the `dev.monthendbuddy` application class, and one package per module with a `package-info.java`.
 - Profiles are `local` and `test`. The API runs on port 8081. Actuator runs on management port 8082, with liveness and readiness groups.
@@ -196,9 +196,10 @@ flowchart LR
 - CI (`backend.yml`) runs the build with unit and integration tests. **Record the actual commands in `CLAUDE.md`.**
 - **Done when** `./mvnw verify` passes in CI, the app boots locally against the Compose database, and `/actuator/health/readiness` on port 8082 reports UP.
 
-### P1.2 Shared kernel · M — L§2, A§6.1, A§13.1
+### P1.2 Shared kernel · M — L§2, A§6.1, A§13.1 · ✅ done 2026-10-26
 
-- Value objects: `Money`, `CurrencyCode`, `Period`, `UserId`. Map `Money` as an embeddable with amount and currency columns.
+- Value objects: `Money`, `CurrencyCode`, `Period`, `UserId`. *As built:* `Money` has no JPA mapping yet. It is mapped per entity when the first money column lands (P1.3/P1.4), because `user_settings` stores amounts without a currency column.
+- *As built:* `common` is an **open** Modulith module, so its sub-packages (`error`, `web`, `persistence`, `events`, `json`, `time`) are visible to every module. `spring.web.resources.add-mappings=false` makes unknown paths raise `NoHandlerFoundException`, so they get the full problem body; with static mappings on, they bypassed `@RestControllerAdvice`.
 - Base classes `BaseEntity` and `UserOwnedEntity`.
 - `UserOwnedRepository<T>`: an `@NoRepositoryBean` interface that extends Spring Data's `Repository<T, UUID>`, not `JpaRepository`. It declares only scoped methods and `save`, so `findById` and `findAll` never exist (A§5.3).
 - Jackson configuration so that money always goes out as `{"amount": "<string>", "currency": …}` and never as a JSON number.
@@ -210,7 +211,7 @@ flowchart LR
   - `Period`: February and leap years, the 24-month limit, a future period returns 422.
   - The `ProblemDetail` shape for 404 and 422.
 
-### P1.3 Identity and authentication · L — A§5, L§3
+### P1.3 Identity and authentication · L — A§5, L§3 · ✅ done 2026-10-26
 
 - Migration `V1`.
 - Entities `User`, `UserSettings` (defaults created at registration) and `RefreshToken`.
@@ -232,8 +233,14 @@ flowchart LR
   - The login limit returns 429.
   - Unit tests for `RefreshToken` state changes.
 - **Done when** no endpoint outside the public list responds without a token.
+- *As built:*
+  - **Login failures:** the two 401 bodies are identical apart from `traceId`. The unknown-email path also runs a dummy Argon2 check, so timing does not reveal registered emails.
+  - **Refresh reuse:** reuse detection commits the family revocation even though the call fails (`noRollbackFor`), and token rows are locked with `SELECT … FOR UPDATE`.
+  - **Proxy headers:** `server.forward-headers-strategy=native` lets rate limits see the client IP behind nginx.
+  - **Local development:** the `local` profile has a development-only JWT secret, and allows the Vite origin `http://localhost:5173` on the refresh and logout endpoints.
+  - **Test support:** integration tests use the `test` profile, `support/MutableClock` (reset after each test) and `support/ApiClient`.
 
-### P1.4 Categories, transactions and the isolation suite · L — A§8.1, L§4.1
+### P1.4 Categories, transactions and the isolation suite · L — A§8.1, L§4.1 · ✅ done 2026-10-26
 
 - Migration `V2`.
 - `Category` (system categories plus custom ones) and `CategoryService` with `listUsable` and `requireUsable`.
@@ -252,8 +259,18 @@ flowchart LR
   - A **coverage guard** lists every handler method with a path variable (from `RequestMappingHandlerMapping`) and fails if any is missing from the suite.
 - **Tests:** CRUD; pagination that stays stable across pages with many rows on the same date; version conflicts; filter combinations.
 - **Done when** the isolation suite and its coverage guard both pass.
+- *As built:*
+  - **Isolation suite:** `UserIsolationIT.cases()` is the table. Its guard was checked by deleting a row, which made it fail. The 404 for another user's ID is byte-identical to the 404 for a missing ID, apart from `traceId` and `instance`.
+  - **Query layer:** list and search run as native SQL in `TransactionQueryRepository`. It uses the indexed `lower(description || ' ' || coalesce(merchant, ''))` expression and a row-value keyset `(transaction_date, id) < (…)`.
+  - **Currency on the wire:** `MoneyDto.currency` is a string, so `USD` gives 422 `unsupported_currency`, not a JSON parse error.
+  - **Category rules:**
+    - A category's kind must match the transaction type.
+    - On update, an unchanged category is accepted even if archived, and keeps its `categorySource`.
+    - System categories have fixed IDs `0192f000-0000-7000-8000-…` and return 403 `category_read_only` on PATCH and DELETE.
+    - An archived category's name stays reserved.
+  - **Events:** IDs are UUIDv7. The `type` field is a string, so consumers need only the `events` package.
 
-### P1.5 Demo user and synthetic data · M — A§5.2, S§4.1
+### P1.5 Demo user and synthetic data · M — A§5.2, S§4.1 · ✅ done 2026-10-26
 
 - A `SyntheticDataGenerator` that takes a seed, an **anchor date** and the number of users:
   - It produces about 6 months of INR data: a monthly salary, realistic categories, and a few **deliberately planted anomalies** for P2.8.
@@ -261,8 +278,22 @@ flowchart LR
 - `POST /auth/demo`, the `users.is_demo` flag, and `DemoDataService.resetDemoUser()` scheduled nightly.
 - A Maven profile (`-Psample-data`, using `exec-maven-plugin`) that exports `sample-data/synthetic-transactions.csv` in the A§8.2 format.
 - **Done when** demo login returns about 6 months of data and the same seed and anchor produce byte-identical output.
+- *As built:*
+  - **New module:** a **`demo` module** (allowed dependencies: identity and transactions; nothing depends on it). It owns `SyntheticDataGenerator`, `SampleCsv`, `SampleDataExporter` and `DemoDataService`. Identity exposes `DemoAccounts`, and transactions exposes `TransactionSeeder` (a bulk replace in one transaction, with no per-row events).
+  - **Generated data:** 214 rows for the committed sample (seed 20261026, anchor 2026-10-15).
+  - **Planted anomalies:**
+    - insurance ₹12,450 in month 1;
+    - laptop ₹62,000 two months back;
+    - dining ₹8,400 last month;
+    - Goa trip ₹18,000 this month.
+  - **Drift check:** `SyntheticDataGeneratorTest` fails if the committed CSV drifts from the generator.
+  - **Demo login and reset:**
+    - `POST /auth/demo` is limited per IP by the `DEMO_LOGIN` bucket (30/hour).
+    - The demo email is reserved, so registering it returns 409.
+    - The reset refuses to touch a non-demo account.
+    - It resets at every startup (changed in P2.9, so a deploy always gets fresh, fully processed demo data) and nightly at 03:00 IST.
 
-### P1.6 Frontend foundation · L — A§14, S§5
+### P1.6 Frontend foundation · L — A§14, S§5 · ✅ done 2026-10-26
 
 - Set up Vite, React, TypeScript, Tailwind, React Router, TanStack Query, React Hook Form with Zod, and the I9 tooling.
 - `lib/apiClient`:
@@ -283,8 +314,16 @@ flowchart LR
   - Money formatting gives `₹1,00,000.00` and handles negative values.
   - Form validation.
 - CI: `frontend.yml` runs lint, test and build.
+- *As built:*
+  - **Version pins:** React 19.3, React Router 8.5 (data router; `RouterProvider` from `react-router/dom`; routes lazy-load), Vite 8, Vitest 5, Tailwind 4 and TanStack Query 5.
+  - **Pinned below latest:**
+    - TypeScript stays on **5.9.3**, because `typescript-eslint` needs <6.1 and `openapi-typescript` needs 5.x.
+    - `@hookform/resolvers` stays on **5.9.2**, because 6.0.0's optional peer dependencies conflict.
+  - **API types:** `src/lib/api/types.ts` narrows the generated types. Springdoc marks every response property optional, and `Money` is now documented as `MoneyDto` (backend `OpenApiConfiguration`).
+  - **Dialog state:** dialogs remount their form via `key` rather than resetting state in effects (React Hooks v7 lint).
+  - **Proxy check:** login, refresh with the Vite origin, and paging were verified through the dev proxy against the real backend.
 
-### P1.7 Containers and Compose `core` · M — A§3
+### P1.7 Containers and Compose `core` · M — A§3 · ✅ done 2026-10-26 (Phase 1 exit check passed)
 
 - Dockerfiles:
   - backend: multi-stage, Temurin 21 JRE, non-root user;
@@ -299,12 +338,46 @@ flowchart LR
   4. Create, edit and delete transactions.
 
   CI must also be passing, including the isolation suite.
+- *As built:*
+  - **Compose file location:** the file is the root `compose.yaml`, not `infra/docker-compose.yml`, because Compose reads `.env` only from the compose file's own directory.
+  - **nginx config:** it is baked into the frontend image through `additional_contexts: infra`, because Docker Desktop for macOS may refuse bind mounts from `~/Desktop`.
+  - **Images:** nginx is `nginx-unprivileged`, and both containers run as non-root users. A placeholder `JWT_SECRET` in `.env.example` is too short on purpose, so the app refuses to start with it.
+  - **Exit check run:**
+    - SPA and deep links;
+    - CSP and other security headers;
+    - `/actuator` not proxied;
+    - demo login → refresh → create → update → delete through nginx;
+    - JSON logs.
 
 ---
 
 ## 6. Phase 2 — Finance features
 
 **Exit (S§13):** all displayed financial figures come from tested backend calculations.
+
+**Backend as built (P2.1–P2.8, 2026-10-26)**, 226 tests passing:
+
+- **Where the public API lives:** each module's root package holds the types and services other modules and the agent use.
+  - `SummaryService`, `ComparisonService`, `AffordabilityService` and `AnomalyService` are in `analytics`.
+  - `BudgetStatusService` is in `budgets`.
+  - `SavingsProjectionService` is in `goals`.
+  - `TransactionAggregations`, `TransactionQueries` and `CategoryQueries` are in `transactions`.
+  - `Assumption` and `AssumptionLabel` moved to `common`, because goals needs them and goals cannot depend on analytics.
+- **Cache and demo reset:**
+  - The cache seams `UserScopedCache` and `CacheGenerationService` are no-ops. Every write service already calls `bumpAfterCommit`.
+  - `DemoDataReset` (in `common`) lets budgets, goals and analytics clear demo data before the reseed. The reseed publishes one `TransactionsImported` event, so the demo account gets budgets checks and anomaly alerts.
+- **CSV import:**
+  - `errors` and `warnings` are `text` columns holding JSON, not `jsonb`; they are never queried.
+  - The 7-day purge also expires idle uploads that were never committed.
+  - Atomicity is proven by `ImportFailureIT`: a failure injected after 600 flushed rows leaves nothing behind.
+  - `server.tomcat.max-swallow-size` is raised so oversized uploads receive the 413 problem instead of a dropped connection.
+- **Event handlers:** both run with `@TransactionalEventListener` plus `REQUIRES_NEW` and extend `IdempotentHandler`. A failing handler does not fail the user's write (`AnomalyHandlerFailureIT`).
+- **P2.7 decision:** `AffordabilityResult.dataQuality` (`MISSING_INPUT`, `LOW_DATA`, `DEADLINE_PASSED`) is kept separate from the assumption labels.
+- **P2.8 refinements, found by probing the sample data** (architecture §9.5 updated):
+  - Routine payments (the same merchant paid at least half the amount within the window) raise no transaction alerts.
+  - `LARGE_VS_CATEGORY` replaces `ABSOLUTE_THRESHOLD` for the same transaction.
+  - Expenses older than 12 months are not evaluated.
+  - Together these cut the sample statement from 21 alerts to 6: the planted ones, plus the first rent payment, which has no history yet.
 
 ```mermaid
 flowchart LR
@@ -319,14 +392,14 @@ flowchart LR
 
 P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
 
-### P2.1 Aggregation queries · M — A§9.1, L§4.1
+### P2.1 Aggregation queries · M — A§9.1, L§4.1 · ✅ done 2026-10-26
 
 - The `TransactionAggregations` interface sits in the module root. `TransactionAggregationRepository` implements it in native SQL: `totalsByType`, `totalsByCategory`, `monthlyTotals`, `categoryAmounts` and `coverage`. It is the only class that issues aggregate SQL.
 - `transaction_date` is a `DATE`, so the SQL does no timezone conversion. The user's timezone only decides which month is "this month".
 - **Tests (Testcontainers, fixtures):** month boundaries; an empty period (`0.00` with count 0); uncategorised rows; another user's rows excluded.
 - **Done when** every sum equals the hand-computed fixture total.
 
-### P2.2 Summary, trends and comparison · M — A§6.3, L§7.1
+### P2.2 Summary, trends and comparison · M — A§6.3, L§7.1 · ✅ done 2026-10-26
 
 - `CashFlowMath`, `SummaryService`, `ComparisonService`, and `AnalyticsController` for `/analytics/summary`, `categories`, `trends` and `compare`.
 - Add the cache interfaces now: `UserScopedCache` with `NoOpUserScopedCache`, and `CacheGenerationService` with a no-op implementation.
@@ -335,14 +408,14 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - Unit tests for every A§6.3 formula used here: income 0 gives savings rate `null` with `NO_INCOME`; a negative net; previous 0 gives Δ% `null` with `isNew`.
   - Responses match the fixture values exactly, as strings.
 
-### P2.3 Category rules · S — A§8.1
+### P2.3 Category rules · S — A§8.1 · ✅ done 2026-10-26
 
 - Migration `V3`.
 - `CategoryRule`, `Categorizer` (priority order; `CONTAINS`, `STARTS_WITH` and `EQUALS` only, with no regex) and `/category-rules` CRUD.
 - Rules apply only when no category is given. A user's edit sets `USER`, and a `USER` category is never overwritten.
 - Add isolation rows.
 
-### P2.4 CSV import · L — A§8.2–8.4, L§4.2
+### P2.4 CSV import · L — A§8.2–8.4, L§4.2 · ✅ done 2026-10-26
 
 - Migration `V4`.
 - Parsing and validation:
@@ -366,7 +439,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - A file with 10,001 rows is rejected.
 - **Done when** importing `sample-data/synthetic-transactions.csv` twice imports it once and reports every row as a duplicate the second time.
 
-### P2.5 Budgets and threshold events · M — A§9.2, L§5
+### P2.5 Budgets and threshold events · M — A§9.2, L§5 · ✅ done 2026-10-26
 
 - Migrations `V5` and `V6`.
 - `Budget`, `BudgetMath`, `BudgetService` CRUD, and `BudgetStatusService`, which returns the top 5 transactions through `TransactionQueries.topExpenses`.
@@ -379,7 +452,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - Only one overall budget and one budget per category.
   - A threshold fires once per month across repeated writes and re-delivered events.
 
-### P2.6 Goals and projections · M — A§9.3, L§6
+### P2.6 Goals and projections · M — A§9.3, L§6 · ✅ done 2026-10-26
 
 - Migration `V7`.
 - `SavingsGoal`, `SavingsMath`, `GoalService` and `SavingsProjectionService`.
@@ -390,7 +463,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - The required monthly amount is rounded up to 2 decimal places.
   - Every projection includes its two default assumptions.
 
-### P2.7 Settings and affordability · M — A§9.4, L§7.1
+### P2.7 Settings and affordability · M — A§9.4, L§7.1 · ✅ done 2026-10-26
 
 - `PATCH /me/settings`, with the `UpdateSettingsCommand` ranges from L§11.2. It sets `current_savings_updated_at` and bumps the cache generation.
 - `AffordabilityCalculator` (pure), `AffordabilityService`, and `SimulationController` for `/simulations/purchase`.
@@ -399,7 +472,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - Update L§7.1 to match.
 - **Tests:** every verdict branch and every input label, with a unit test each.
 
-### P2.8 Anomaly rules and alerts · M — A§9.5, L§7.2, C1
+### P2.8 Anomaly rules and alerts · M — A§9.5, L§7.2, C1 · ✅ done 2026-10-26
 
 - Migration `V8`.
 - The three `AnomalyRule` components, `AnomalyContextFactory`, `AnomalyService`, and an in-process `AnomalyHandler` with the same `REQUIRES_NEW` rule as P2.5.
@@ -412,7 +485,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - an amount equal to the threshold fires, because that rule is `≥`.
 - **Integration test:** the anomalies planted in P1.5 produce exactly the expected alerts.
 
-### P2.9 Dashboard and finance pages · L — S§4.3, S§7, A§13.2, A§14
+### P2.9 Dashboard and finance pages · L — S§4.3, S§7, A§13.2, A§14 · ✅ done 2026-10-27 (Phase 2 exit check passed)
 
 - Overview page:
   - stat cards for income, expenses, net and savings rate;
@@ -432,6 +505,17 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - With the demo user, every number on the overview page appears verbatim in an API response.
   - Every A§6.3 formula has unit tests.
   - The isolation suite covers every Phase 2 endpoint.
+- *As built:*
+  - **Pages:** the dashboard (`features/dashboard`) and the import wizard (`/import`), plus the Budgets, Goals & plans (projections and the purchase check) and Settings (savings, alert sensitivity, category rules) pages.
+  - **Charts:**
+    - They use Recharts 3.10.1, coloured from the dataviz reference palette's dark steps. The two series colours were validated on the card surface `#10131a` (CVD ΔE 26.8).
+    - Every chart card has a table-view twin.
+    - Meters state their severity in words.
+    - Only `plotValue()` turns an API amount into a `Number`, and only for drawing.
+  - **Response types:** Phase 2 response types are hand-written in `lib/api/types.ts` with explicit `| null`, because springdoc cannot express which fields are nullable. Request bodies still come from the generated schema.
+  - **Goal projections** are TanStack *queries* (POST, but nothing is saved), keyed by goal and amount.
+  - **The demo account** now also gets four budgets and two goals, and it resets at every startup.
+  - **Exit check:** component tests assert that every displayed figure is the API string formatted, and that months without data read "No data". The API smoke run on the demo account showed consistent figures and the 6 expected alerts.
 
 ---
 
@@ -441,7 +525,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
 
 **Before starting:** ADR 0001 (P0.3) must exist. If it is more than about two months old, check model availability and limits again.
 
-### P3.1 Agent foundations · M — L§8.1, L§8.3, A§10.2, A§10.8
+### P3.1 Agent foundations · M — L§8.1, L§8.3, A§10.2, A§10.8 · ✅ done 2026-10-27
 
 - Migration `V9`.
 - `AgentConversation`, `AgentMessage`, `ConversationService`, and `/agent/conversations` list, get and delete.
@@ -457,8 +541,14 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - rebuild assistant messages from our own types, so gpt-oss reasoning is never replayed (Groq rejects it with 400);
   - use definition-only tool callbacks.
 - **Tests:** a boot test with no key; provider failures map to `ProviderUnavailableException`.
+- *As built:*
+  - **The port:** `agent/llm` holds the provider-neutral types (`LlmGateway`, `LlmRequest`, `LlmReply`, `LlmMessage`, `ToolCall`, `ToolSpec`).
+  - **`SpringAiLlmGateway` registers itself** with `@ConditionalOnProperty(meb.agent.provider=groq)`, so no other class touches Spring AI. `AgentArchitectureTest` enforces this: no class but the gateway depends on `org.springframework.ai..` or `com.openai..`, and nothing uses `ChatClient`.
+  - **Failure handling:** a 429 is retried once after its `Retry-After` when that is ≤ 5 s; otherwise it fails fast. A 5xx or I/O error is retried once after 300–1000 ms of jitter. Any other client exception becomes `PROVIDER_UNAVAILABLE` and never a 500. The breaker uses a 60-second time-based window, opens after 5 calls at a 50% failure rate, and stays open for 30 s.
+  - **`agent_messages`** extends `UserOwnedEntity` like every other table, so V9 gives it `updated_at` and `version` too.
+  - **Health:** the `aiProvider` indicator is always UP and reports `AVAILABLE`, `NOT_CONFIGURED` or `CIRCUIT_OPEN`.
 
-### P3.2 Tool framework · M — L§8.2, A§10.4
+### P3.2 Tool framework · M — L§8.2, A§10.4 · ✅ done 2026-10-27
 
 - `FinanceTool<I>`, `ToolContext`, `ToolResult`, `ToolExecution` and `Provenance`.
 - `ToolRegistry`:
@@ -474,8 +564,14 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - Oversized results are truncated.
   - `execute()` never throws, even on garbage input.
 - **Structural guard:** a reflection test fails if any tool input record declares a `userId` field (D2).
+- *As built:*
+  - **Schemas:** `ToolRegistry` hands out `ToolSpec(name, description, inputType)`, and the gateway turns each into a schema with `JsonSchemaGenerator.generateForType`. Optional fields carry `@JsonProperty(required = false)`; descriptions use `@JsonPropertyDescription`, so tool inputs import no Spring AI types.
+  - **Size cap:** the 8 KB cap drops rows from the end of the longest list, about a tenth at a time, and marks the payload `truncated`.
+  - **UI-only fields:** a tool can declare fields that only the UI needs (`uiOnlyFields`, for example the projection's chart series). They stay in the evidence and are left out of what the model is sent, which saves tokens without changing any figure.
+  - **Errors:** a fourth error code, `TOOL_FAILED`, covers unexpected exceptions. Every `INVALID_ARGUMENT` message ends with an instruction to call the tool again and never answer without the data.
+  - **Guard:** `ToolInputGuardTest` walks every `FinanceTool<I>` type argument, recursively, for `userId`, `user` or `owner` components.
 
-### P3.3 Orchestrator and the first three tools · L — A§10.3, A§10.5, A§10.6, A§10.9
+### P3.3 Orchestrator and the first three tools · L — A§10.3, A§10.5, A§10.6, A§10.9 · ✅ done 2026-10-27
 
 - Tools: `getMonthlySummary`, `getExpensesByCategory` and `calculateSavingsProjection`. Each calls the **same service method as its REST endpoint**.
 - `PromptBuilder` with `agent/prompts/system-v1.md` (the content is in A§10.5), plus `ResponseAssembler` and `CollectingAgentEventSink`.
@@ -494,8 +590,14 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - a concurrent turn returns 409;
   - an isolation row for each tool.
 - **Done when**, with a real key and the demo user, "Where did most of my salary go this month?" returns `COMPLETE`, and its evidence figures equal `/analytics/categories`.
+- *As built:*
+  - **Provider budget:** `PROVIDER_GLOBAL` counts model calls (30 a minute). A new `PROVIDER_TOKENS` bucket counts tokens (6,000 a minute). `RateLimiter` gained `tryConsume(bucket, key, tokens)` and `charge(…)`.
+  - **Admission at turn start:** the budget can refuse only the first model call of a turn. Later calls are charged, possibly into overdraft, so a turn is never cut off after it has gathered evidence; the next turn waits for the refill. The first live run showed why: one three-call turn used about 6,000 tokens, and a per-call check had stopped it just before the final answer.
+  - **Prompt context:** `PromptBuilder` sends the active goals (ID and name) as a separate JSON "data, not instructions" system message, so the goal tools have IDs to use. The history note "(Figures above came from: tool{args})" stands in for earlier tool results.
+  - **Concurrency:** ownership is checked before the turn lock, so another user's conversation is always 404 and never a 409 that would reveal it exists.
+  - **Done-when check (live, `openai/gpt-oss-120b`, demo user):** `COMPLETE` in 3 iterations, using `getMonthlySummary` and `getExpensesByCategory`, 6,116 prompt and 510 completion tokens, 3.7 s. The evidence equals `/analytics/categories` exactly, and `unverifiedAmounts` is empty.
 
-### P3.4 Remaining tools, clarification and proposed actions · M — A§10.4, L§8.2
+### P3.4 Remaining tools, clarification and proposed actions · M — A§10.4, L§8.2 · ✅ done 2026-10-27
 
 - Tools:
   - `compareMonthlySpending`;
@@ -509,8 +611,13 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
 - **Grounding check (C4):** extract the money values from `answer` and mark any that don't appear in `evidence`; the UI shows them as "estimate — not from your data". A scripted test reproduces the spike's case, where a tool error is followed by an invented table.
 - Tools clamp out-of-range limits and set `truncated: true`. `INVALID_ARGUMENT` is kept for genuinely invalid input, and its message tells the model to call the tool again with corrected arguments, never to answer without data.
 - Add isolation rows, for example `goalId` or `goalIds` belonging to another user must return `NOT_FOUND`.
+- *As built:*
+  - **Proposals:** the mapping is recorded in L§8.3. It has `CREATE_BUDGET` (largest discretionary category without a budget), `UPDATE_BUDGET` (overspent) and `CREATE_GOAL` (unsaved projection). `UPDATE_GOAL_CONTRIBUTION` is not produced, because goals store no contribution.
+  - **Bounded rows:** `getTransactions`, `getBudgetStatus` and `findUnusualTransactions` return text through `ToolTransactionRow` and `Tools.text`, which clean it and cut it to 120 characters, with notes left out. `getTransactions` matches a category by name through the new `CategoryQueries.usable(user)`.
+  - **Grounding:** `GroundingCheck` produces `AgentResponse.unverifiedAmounts`. `AgentChatIT` reproduces the spike's tool-error-then-invented-table case.
+  - **Isolation:** `UserIsolationIT.toolCases()` runs every tool with the intruder's context and the owner's IDs, and its guard fails when a new tool has no row.
 
-### P3.5 Copilot UI (JSON transport) · L — A§10.6, A§14, S§7
+### P3.5 Copilot UI (JSON transport) · L — A§10.6, A§14, S§7 · ✅ done 2026-10-27
 
 - A copilot page or side panel:
   - prompt suggestions and a loading state;
@@ -526,8 +633,13 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - Each `AgentStatus` renders its own state.
   - An unknown tool uses the fallback card.
   - Evidence cards show only values present in `result`.
+- *As built:*
+  - **Page:** `features/copilot` holds `CopilotPage`, `EvidenceCards` (registry plus fallback), `Markdown`, `ProposedActions` and `QuickInsights`.
+  - **Markdown renderer:** hand-written and dependency-free. It builds React elements for paragraphs, lists, bold, italic and code. HTML shows as text, links show only their text, and amounts in `unverifiedAmounts` are marked in text as well as colour.
+  - **Proposed actions:** these open the existing Budget and Goal dialogs, now exported with an optional `draft`.
+  - **Header:** a CSS gradient for now; the WebGL shader is P4 work (A§14).
 
-### P3.6 AI evaluation set and model gate · M — A§17.3
+### P3.6 AI evaluation set and model gate · M — A§17.3 · ✅ done 2026-10-27
 
 - Fixtures come from the P1.5 generator, with a fixed seed, a fixed anchor date and two users.
 - `backend/src/test/resources/eval/cases.yaml` lists, for each case:
@@ -543,6 +655,10 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - The gate passes.
   - Every evidence figure in the eval equals the matching REST response.
   - The scripted failure-mode tests pass.
+- *As built:*
+  - **Harness:** `eval/cases.yaml` holds 11 cases, run by `AiEvalScriptedIT` (CI, reference tool calls) and `AiEvalLiveIT` (`-PaiEval`). They share `AiEvalFixture`, which seeds two generator households plus an injection and a marker transaction, and `EvalGrader`. The bar is in `docs/ai-evaluation.md`.
+  - **Injection case:** it checks behaviour, not words. The planted description asks for a `simulatePurchase` call, which the case forbids, so quoting the text is allowed and obeying it is not.
+  - **Exit check, 2026-10-27:** `gpt-oss-120b` passed the gate at 10/11. Both safety cases passed and the evidence equalled REST in every case. The one miss was `empty-range`, which said "₹0.00 in expenses" alongside "no transactions recorded"; the follow-up is noted in the eval doc. The scripted failure-mode tests pass, so **Phase 3 is complete**.
 
 ---
 
@@ -550,7 +666,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
 
 **Exit (S§13):** polished desktop and mobile experiences with smooth but non-distracting animation.
 
-### P4.1 SSE streaming · M — A§10.7
+### P4.1 SSE streaming · M — A§10.7 · ✅ done 2026-10-27
 
 - Backend:
   - `SseAgentEventSink`;
@@ -562,15 +678,63 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - `lib/sse.ts` reads the stream with `fetch` and `ReadableStream`, and must handle an event split across chunks;
   - `useAgentChat` runs the state machine `idle → thinking → tool_running → answering → done | error`.
 - **Tests:** the parser with split chunks; the state-machine transitions; the backend's events arrive in order and `final` equals the JSON response.
+- *As built:*
+  - **Decision:** a disconnect does not cancel the turn; it finishes and is persisted. The full stream contract is in A§10.7.
+  - **Backend:**
+    - `AgentController` has a second `POST /chat` mapping with `produces = text/event-stream`, and the JSON mapping is unchanged. Both call `admit()` (rate limit, ownership, lock) on the request thread.
+    - Streamed turns run on a virtual-thread `SimpleAsyncTaskExecutor` that the controller owns. It isn't declared as a bean, because one would replace Boot's application executor.
+    - `SseAgentEventSink` drops sends once the client has gone.
+    - The orchestrator no longer calls `failed()` for `PROVIDER_UNAVAILABLE`; that status arrives as `final`.
+    - `SecurityConfiguration` permits `DispatcherType.ASYNC`. Without that, completing the stream was denied after the response was committed.
+  - **nginx:** `location = /api/v1/agent/chat`, with `proxy_buffering off` and `proxy_read_timeout 120s`. The proxy headers are repeated there, because they don't inherit.
+  - **Frontend:**
+    - `lib/sse.ts` (`readSse`) handles chunk splits, split UTF-8, CRLF and comments.
+    - `apiFetch` and `toApiError` in `lib/api/client.ts` share the refresh-on-401 path with the stream.
+    - `features/copilot/useAgentChat.ts` holds the reducer and the hook. A stream with no terminal event becomes `stream_interrupted`, and the hook refetches the conversation list.
+    - `ToolStatus.tsx` shows the current step and the steps finished.
+    - A JSON response is still accepted as a fallback.
+  - **Tests:**
+    - `AgentStreamingIT` (7): event order and `final` = JSON; JSON when there is no SSE Accept; provider failure arrives as a single `final`; a crash arrives as `error` with its `traceId`; 422 and 409 are problems under the SSE Accept; the lock is released; a disconnect still persists the turn.
+    - `UserIsolationIT.intruderCannotStreamATurnIntoTheOwnersConversation`.
+    - Vitest: `sse.test.ts`, `useAgentChat.test.ts`, and four streamed `CopilotPage` tests. One of them reopens a conversation after an interrupted turn: opening a conversation always reloads its snapshot, which `staleTime: Infinity` would otherwise serve from cache.
+    - `AgentStreamingIT` sends the SPA's exact `Accept` header.
 
-### P4.2 Design system and layout · L — S§7
+### P4.2 Design system and layout · L — S§7 · ✅ done 2026-10-27
 
-- Tokens for color, spacing, radius, shadow and typography, defined as CSS variables and wired into Tailwind. Dark mode comes first.
+- Tokens for color, spacing, radius, shadow and typography, defined as CSS variables and wired into Tailwind. Dark mode comes first. *(Reversed in P4.3: light is the default and dark is a selected theme.)*
 - One icon set.
 - Primitives: Card, Stat, Button, a table that becomes a card list, Skeleton, EmptyState, ErrorState, and a focus ring.
 - Navigation and top bar per S§7, applied to every page.
+- *As built:*
+  - **Tokens** live in `styles.css` `@theme`, so Tailwind generates the utilities:
+    - colours, plus `focus` and `scrim`;
+    - a role type scale: `text-display`, `text-title`, `text-figure`, `text-heading` and `text-caption`;
+    - spacing: `p-card` and `gap-section`;
+    - radius: `rounded-control`, `rounded-card` and `rounded-pill`;
+    - shadow: `shadow-card` and `shadow-overlay`.
+    Raw `rounded-[var(--radius-card)]`, `rounded-lg` and `shadow-xl` are gone. Inter is self-hosted through `@fontsource-variable/inter` 5.3.0, which the CSP's `font-src 'self'` allows. Vitest runs with `css: false`, so the check that each token class reaches `dist/assets/*.css` is a grep of the build output.
+  - **Icons:** lucide-react only.
+  - **Primitives** in `components/`:
+    - `Card` and `CardHeader`, with `ChartCard` built on them;
+    - `Stat`, which replaces `StatTile`;
+    - `PageHeader`, used on every page;
+    - `DataList<T>`, a table at md+ and cards below from one column definition (`TransactionList` uses it);
+    - `Popover`, a disclosure that closes on Escape (returning focus), a click outside, focus leaving it, and navigation;
+    - the existing Button, Skeleton, EmptyState, ErrorState and the global `:focus-visible` ring.
+    The import preview stays a scrollable table, which S§7 allows.
+  - **Shell (S§7):**
+    - The sidebar shows Overview, Transactions, Budgets, Savings goals and AI Copilot (no longer "Soon"), with Settings and the profile at the bottom. The bottom nav uses explicit short labels.
+    - The top bar has a greeting and today's date (a deliberate deviation, recorded in A§18) and Quick add: add a transaction via `/transactions?new=1` (the flag is removed once used), import, ask the copilot.
+    - Notifications show open alerts with a count in the button's name; a load error only hides the count.
+    - An account menu holds Settings and Sign out.
+    - `AlertList` moved to `features/alerts`. The unused `ComingSoonPage` is deleted.
+  - **Phone layout, checked by measurement only:**
+    - On phones a popover anchors to the positioned button group (`max-sm:static`), so panels line up with the gutter instead of running off the left edge.
+    - On a phone's top bar the wordmark and the demo badge's text are `sr-only`, so the bar fits at 360 px for the demo user.
+    - `Stat` keeps proportional digits; tabular digits are only for aligned columns.
+  - **Tests:** `AppShell.test.tsx` (7), `TransactionsPage.test.tsx` (2, including the `?new=1` flag being removed) and the date helpers. A visual review at desktop and phone widths is still pending; it is part of the P4.5 exit check.
 
-### P4.3 Motion · M — S§7, A§14
+### P4.3 Motion · M — S§7, A§14 · ✅ done 2026-10-27
 
 - `<MotionConfig reducedMotion="user">` and duration and easing tokens.
 - Animate:
@@ -579,6 +743,50 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
   - chat messages appearing;
   - tool-status transitions.
 - Financial figures are never count-up animated.
+- *As built:*
+  - **Library:** `motion` 14.7.0, imported from `motion/react` (checked before use). `<MotionConfig reducedMotion="user">` wraps the app in `main.tsx`, and the tokens (`ease`, `duration`, `stagger`, `revealItem`, `chartTransition`) are in `lib/motion.ts`.
+  - **Restyle to the owner's reference design**, done in the same change:
+    - It reverses P4.2's dark-first choice. Light is the default; the dark theme has its own validated steps under `html[data-theme='dark']`. `public/theme.js` sets the theme before first paint, as an external file because the CSP allows only `script-src 'self'`. The top bar has a sun/moon toggle, remembered in `localStorage`.
+    - The sidebar is replaced by top pill navigation, whose dark pill slides to the current page with `layoutId`. Between `lg` and `xl` it shows icons only; below `lg` the bottom bar is used. The greeting moved to the overview's header (A§18).
+    - The logo is the robot's head, cropped from `public/download-removebg-preview.png` to `logo-mark.png` and `favicon.png`.
+  - **The overview as a bento grid:**
+    - Net cash flow sits in the hero, with a pixel grid drawn from the trend.
+    - Income has a spent/kept split. There is no income delta, because the API has none.
+    - Colour follows the entity across the page. Blue is always income and the deeper lime is always expenses, in the trend, the pixel grid (a column is income and its lime foot was spent) and the "Spent" split. "Kept" uses the positive tone, and the share bar uses neutral steps.
+    - Expenses has the API's delta and a share bar of the top three categories.
+    - The reference's eye toggle is left out, because it would hide only one of the figures that show net cash flow.
+    - A dark goal dial (`progressPct`) sits over the budget rows.
+    - Cash flow is drawn as custom pill columns. Income and expenses share one axis, months without data are hatched, and the values are pinned above the active month. Its table twin is unchanged.
+    - The other cards are a copilot card, an unusual-spending count, import, recent transactions (with a search through the API's `q`), spending by category and insights.
+    - `Stat` is removed, since the cards replace it. The new primitives are `Chip`, `IconChip`, `Figure` (paise set smaller, with the whole string in one `sr-only` node), `buttonClass`, `Reveal`/`RevealGrid` and the charts `PixelGrid`, `GoalGauge` and `ShareBar`.
+  - **Chart series:** `#2f5bf5` and `#86b817` on white, and `#5b82ff` and `#74a30c` on `#17181c`, validated with the dataviz script. The light expense step warns on contrast (2.36:1), which the table views relieve. The bright lime `--color-lime` is decoration only.
+  - **What animates:**
+    - Cards rise in sequence on mount, not on scroll, so no IntersectionObserver is needed.
+    - Each page fades in on navigation.
+    - Popovers and dialogs animate on open only; closing stays instant, so focus and the outside-click tests never wait.
+    - Chat turns slide in, tool-status phases and steps fade in, and meters, category bars, pill columns, pixel cells, share segments and the dial arc grow in. The projection chart is revealed left to right with a clip-path when motion is allowed, because Recharts' own line animation stalled at zero length in headless Chrome.
+  - **Tests:** `src/test/setup.ts` sets `MotionGlobalConfig.skipAnimations` and stubs `matchMedia`. `AppShell.test.tsx` adds a theme-toggle test. The dashboard and copilot assertions follow the new layout: figures shown twice use `getAllByText`, and the copilot's no-`img` check is scoped to the conversation.
+  - **Checked against a synthetic mock API, because Docker was not running:**
+    - headless Chrome screenshots of the overview at 1440 px, light and dark;
+    - the transactions, goals, settings, import, budgets and copilot pages at 1280 px in both themes, plus login;
+    - at 390 px, the measured scroll width equals the client width, with no element past the right edge. Visually, only the cards down to the hero were confirmed at that width, because headless capture freezes the stagger inside an iframe.
+    The review against the real backend is still part of the P4.5 exit check.
+
+### P4.3a Savings clarity and month-end review · M — A§9.3, A§9.4, A§9.6 · ✅ done 2026-10-28
+
+Added at the owner's request after P4.3. People could not tell "Savings today" (Settings) from a goal's saved amount, and asked why what they keep each month does not reach their savings.
+
+- **Projection label.** A goal projection named the goal's own saved amount `currentSavings` with the "From your profile" label, as if it were Settings savings. It is now `goalSaved`, shown as "Saved toward this goal".
+- **Purchase check.** Savings today is a total. What active goals already hold (`savingsSetAside`) is subtracted before the purchase, giving `availableSavings`. The same applies to a stated savings figure. Goals holding more than the savings raise `GOALS_EXCEED_SAVINGS`. A§9.4 has the formula.
+  - **Results change:** the same savings now give a stricter verdict when goals hold money.
+  - **Demo:** demo savings rise from ₹1,85,000 to ₹3,10,000, so the demo goals (₹2,07,000) sit inside them. The demo's ₹60,000 check stays "with trade-offs".
+  - **Eval:** the scripted eval passes unchanged. The live gate (10/11) predates this formula and was not re-run.
+- **Settings hints.** Savings today is "everything in your accounts, including money set aside for goals". The buffer hint says to set it to 0 if one of your goals is your emergency fund, since otherwise that money is counted twice.
+- **Month-end review** (A§9.6):
+  - **API:** `GET` and `POST /month-review`, migration `V10__month_reviews.sql`, `UserSavingsCommands` (identity) and `GoalCommands.contribute` (goals).
+  - **Card:** the overview shows a review card while last month is `DUE`. It starts with "add to savings" unticked when Savings today was updated after the month ended (`savingsUpdatedSinceMonthEnd`), so the same money is not counted twice.
+  - **Tests:** `MonthReviewApiIT` (6), a body-reference isolation test in `UserIsolationIT`, the calculator and affordability ITs, and `MonthReviewCard.test.tsx` (5).
+- **Verified:** the full backend build and the frontend checks pass. The new endpoints were called against the real backend as the demo user. The review card was screenshotted against the mock API.
 
 ### P4.4 Shader · M — S§7, A§14
 
@@ -598,7 +806,7 @@ P2.3 and P2.4 (import) can proceed in parallel with P2.1 and P2.2, as can P2.6.
 - **Phase 4 exit check:**
   - Review the app at desktop and phone widths, with reduced motion both on and off.
   - axe reports no serious violations.
-  - The copilot streams tool status.
+  - The copilot streams tool status, through nginx as well: `curl -N` against :8080 with the scripted provider shows `tool_started` before the turn ends, not all events in one burst at the end.
 
 ---
 

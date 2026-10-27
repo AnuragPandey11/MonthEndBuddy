@@ -1,0 +1,134 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (spec §7, P4.2, restyled in P4.3): a light bento layout, with soft grey canvas, white cards, one
+ * electric-blue accent and a lime highlight. Dark is a selected theme (`html[data-theme='dark']`, set before first
+ * paint by /theme.js), not an automatic inversion. Every token lives in @theme, so Tailwind generates its utilities
+ * (`bg-surface`, `rounded-card`, `shadow-overlay`, `text-title`, `p-card`, `gap-section`, ...). Components use these,
+ * not raw values.
+ */
+@theme {
+  /* Surfaces, from the page back to raised panels. */
+  --color-canvas: #eceef1;
+  --color-surface: #ffffff;
+  --color-elevated: #f3f4f6;
+  --color-line: #e6e8ec;
+  --color-line-strong: #d5d8de;
+  /* Text: ink for content, muted for labels, faint for metadata (4.5:1 on white). */
+  --color-ink: #121316;
+  --color-muted: #5b606c;
+  --color-faint: #717683;
+  --color-accent: #2f5bf5;
+  --color-accent-strong: #2448d8;
+  --color-positive: #15824a;
+  --color-negative: #d22f25;
+  --color-warning: #a2620a;
+  --color-focus: #2f5bf5;
+  /* The dark feature panel (the goal gauge, the active nav pill) in both themes, and the text on it. */
+  --color-night: #1b1c20;
+  --color-on-night: #f4f5f7;
+  /* Decoration only (buttons, badges, the pixel grid): too light to carry data on white. */
+  --color-lime: #c8ef42;
+  --color-on-lime: #1b1c20;
+  /* Behind dialogs. */
+  --color-scrim: rgb(15 17 21 / 0.45);
+
+  /*
+   * Chart series. Validated with the dataviz validate_palette.js against the white card surface: all checks pass,
+   * CVD ΔE 39.4; the expense step warns on contrast (2.36:1), relieved by every chart's table view.
+   */
+  --color-series-income: #2f5bf5;
+  --color-series-expense: #86b817;
+
+  /* Self-hosted (index.css from @fontsource-variable/inter), so the strict CSP's font-src 'self' allows it. */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Type scale for roles; body text uses Tailwind's text-sm / text-xs. */
+  --text-display: 2.75rem;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 600;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-title--font-weight: 600;
+  --text-figure: 2rem;
+  --text-figure--line-height: 2.25rem;
+  --text-figure--letter-spacing: -0.03em;
+  --text-figure--font-weight: 600;
+  --text-heading: 1rem;
+  --text-heading--line-height: 1.5rem;
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading--font-weight: 600;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1rem;
+
+  /* Spacing: inside a card, and between the cards of a page. */
+  --spacing-card: 1.25rem;
+  --spacing-section: 1rem;
+
+  --radius-control: 0.75rem;
+  --radius-card: 1.5rem;
+  --radius-pill: 9999px;
+
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-overlay: 0 24px 48px -12px rgb(16 24 40 / 0.22), 0 0 0 1px rgb(16 24 40 / 0.06);
+}
+
+/* The dark theme: its own steps, validated against its own surface (#17181c), not a flip of the light ones. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #0e0f12;
+  --color-surface: #17181c;
+  --color-elevated: #212328;
+  --color-line: #27292f;
+  --color-line-strong: #363940;
+  --color-ink: #eceef2;
+  --color-muted: #a3a8b4;
+  --color-faint: #848995;
+  --color-accent: #5b82ff;
+  --color-accent-strong: #3f63e8;
+  --color-positive: #3ecf8e;
+  --color-negative: #f6787a;
+  --color-warning: #f2b94b;
+  --color-focus: #5b82ff;
+  --color-night: #343842;
+  --color-scrim: rgb(0 0 0 / 0.6);
+  /* validate_palette.js --mode dark --surface #17181c: all checks pass, CVD ΔE 31.5. */
+  --color-series-income: #5b82ff;
+  --color-series-expense: #74a30c;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-overlay: 0 24px 48px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.05);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-canvas text-ink antialiased;
+    font-family: var(--font-sans);
+  }
+  /* One focus ring for every interactive element, keyboard only. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Financial figures line up in columns. */
+.figure {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The hatch for a month without data (missing data is not zero spending) and the copilot card's stripes. */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, var(--color-line-strong) 0 1px, transparent 1px 7px);
+}
+.stripes {
+  background-image: repeating-linear-gradient(
+    120deg,
+    color-mix(in oklab, var(--color-line) 70%, transparent) 0 22px,
+    transparent 22px 64px
+  );
+}

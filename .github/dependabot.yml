@@ -4,5 +4,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
-  # Add `maven` (directory /backend) in P1.1 and `npm` (directory /frontend) in P1.6,
-  # once those directories exist; Dependabot errors on missing directories.
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
