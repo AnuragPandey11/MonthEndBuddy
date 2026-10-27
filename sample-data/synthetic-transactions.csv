@@ -1,0 +1,215 @@
+date,description,amount,type,merchant,category,currency
+2026-05-01,Salary May,95000.00,INCOME,Acme Technologies,Salary,INR
+2026-05-01,Coffee,991.00,EXPENSE,Third Wave Coffee,Dining,INR
+2026-05-02,Cab ride,634.00,EXPENSE,Uber,Transport,INR
+2026-05-03,Food delivery,806.00,EXPENSE,Zomato,Dining,INR
+2026-05-03,Bike taxi,113.00,EXPENSE,Rapido,Transport,INR
+2026-05-04,Auto ride,295.00,EXPENSE,Ola,Transport,INR
+2026-05-05,Rent May,25000.00,EXPENSE,Landlord (UPI),Rent,INR
+2026-05-05,Quick groceries,3230.50,EXPENSE,Zepto,Groceries,INR
+2026-05-06,Quick groceries,1907.00,EXPENSE,Zepto,Groceries,INR
+2026-05-06,Petrol,2075.00,EXPENSE,Indian Oil,Transport,INR
+2026-05-07,Netflix subscription,649.00,EXPENSE,Netflix,Subscriptions,INR
+2026-05-09,Spotify subscription,119.00,EXPENSE,Spotify,Subscriptions,INR
+2026-05-10,Two-wheeler loan EMI,6500.00,EXPENSE,Bajaj Finance,EMI & Loans,INR
+2026-05-10,Milk and essentials,2865.00,EXPENSE,Blinkit,Groceries,INR
+2026-05-10,Chai and snacks,929.00,EXPENSE,Chai Point,Dining,INR
+2026-05-10,Bike taxi,373.00,EXPENSE,Rapido,Transport,INR
+2026-05-12,Broadband,999.00,EXPENSE,ACT Fibernet,Utilities,INR
+2026-05-12,Petrol,1520.00,EXPENSE,Indian Oil,Transport,INR
+2026-05-13,Bike taxi,95.50,EXPENSE,Rapido,Transport,INR
+2026-05-13,Bike taxi,103.00,EXPENSE,Rapido,Transport,INR
+2026-05-14,Electricity bill,2523.00,EXPENSE,BESCOM,Utilities,INR
+2026-05-14,Phone accessories,1139.50,EXPENSE,Flipkart,Shopping,INR
+2026-05-15,Bike taxi,314.00,EXPENSE,Rapido,Transport,INR
+2026-05-15,Health insurance premium,12450.00,EXPENSE,Star Health,Insurance,INR
+2026-05-16,Milk and essentials,2922.00,EXPENSE,Blinkit,Groceries,INR
+2026-05-18,Mobile recharge,399.00,EXPENSE,Jio,Utilities,INR
+2026-05-19,Lunch,1246.00,EXPENSE,Meghana Foods,Dining,INR
+2026-05-19,Bike taxi,518.00,EXPENSE,Rapido,Transport,INR
+2026-05-24,Groceries,2062.00,EXPENSE,DMart,Groceries,INR
+2026-05-24,Dinner,1299.00,EXPENSE,Truffles,Dining,INR
+2026-05-25,Bike taxi,384.00,EXPENSE,Rapido,Transport,INR
+2026-05-26,Food delivery,388.00,EXPENSE,Swiggy,Dining,INR
+2026-05-26,Phone accessories,4054.00,EXPENSE,Flipkart,Shopping,INR
+2026-05-26,Clothing,2965.00,EXPENSE,Myntra,Shopping,INR
+2026-05-28,Milk and essentials,2109.50,EXPENSE,Blinkit,Groceries,INR
+2026-05-28,Auto ride,616.00,EXPENSE,Ola,Transport,INR
+2026-05-31,Auto ride,308.00,EXPENSE,Ola,Transport,INR
+2026-05-31,Metro card top-up,637.50,EXPENSE,Namma Metro,Transport,INR
+2026-05-31,Doctor consultation,658.00,EXPENSE,Practo,Health,INR
+2026-06-01,Salary June,95000.00,INCOME,Acme Technologies,Salary,INR
+2026-06-01,Bike taxi,106.00,EXPENSE,Rapido,Transport,INR
+2026-06-02,Food delivery,397.00,EXPENSE,Swiggy,Dining,INR
+2026-06-03,Food delivery,494.00,EXPENSE,Swiggy,Dining,INR
+2026-06-03,Cab ride,538.00,EXPENSE,Uber,Transport,INR
+2026-06-05,Rent June,25000.00,EXPENSE,Landlord (UPI),Rent,INR
+2026-06-05,Bike taxi,263.50,EXPENSE,Rapido,Transport,INR
+2026-06-06,Lunch,1374.00,EXPENSE,Meghana Foods,Dining,INR
+2026-06-07,Netflix subscription,649.00,EXPENSE,Netflix,Subscriptions,INR
+2026-06-08,Weekly groceries,659.00,EXPENSE,BigBasket,Groceries,INR
+2026-06-09,Spotify subscription,119.00,EXPENSE,Spotify,Subscriptions,INR
+2026-06-09,Milk and essentials,1708.00,EXPENSE,Blinkit,Groceries,INR
+2026-06-09,Clothing,4168.00,EXPENSE,Myntra,Shopping,INR
+2026-06-10,Two-wheeler loan EMI,6500.00,EXPENSE,Bajaj Finance,EMI & Loans,INR
+2026-06-11,Cab ride,412.50,EXPENSE,Uber,Transport,INR
+2026-06-11,Bike taxi,544.50,EXPENSE,Rapido,Transport,INR
+2026-06-12,Broadband,999.00,EXPENSE,ACT Fibernet,Utilities,INR
+2026-06-13,Food delivery,1233.50,EXPENSE,Swiggy,Dining,INR
+2026-06-13,Cab ride,453.00,EXPENSE,Uber,Transport,INR
+2026-06-14,Electricity bill,1893.00,EXPENSE,BESCOM,Utilities,INR
+2026-06-14,Petrol,1617.50,EXPENSE,Indian Oil,Transport,INR
+2026-06-15,Metro card top-up,607.50,EXPENSE,Namma Metro,Transport,INR
+2026-06-15,Doctor consultation,1316.00,EXPENSE,Practo,Health,INR
+2026-06-16,Online order,3841.00,EXPENSE,Amazon,Shopping,INR
+2026-06-18,Mobile recharge,399.00,EXPENSE,Jio,Utilities,INR
+2026-06-18,Quick groceries,700.00,EXPENSE,Zepto,Groceries,INR
+2026-06-18,Cab ride,444.50,EXPENSE,Uber,Transport,INR
+2026-06-20,Chai and snacks,1229.00,EXPENSE,Chai Point,Dining,INR
+2026-06-22,Haircut,519.00,EXPENSE,Naturals Salon,Personal Care,INR
+2026-06-23,Auto ride,541.00,EXPENSE,Ola,Transport,INR
+2026-06-24,Quick groceries,2793.50,EXPENSE,Zepto,Groceries,INR
+2026-06-24,Groceries,2573.00,EXPENSE,DMart,Groceries,INR
+2026-06-24,Chai and snacks,270.50,EXPENSE,Chai Point,Dining,INR
+2026-06-24,Cab ride,87.00,EXPENSE,Uber,Transport,INR
+2026-06-26,Chai and snacks,396.00,EXPENSE,Chai Point,Dining,INR
+2026-06-28,Savings account interest,580.00,INCOME,HDFC Bank,Interest,INR
+2026-06-29,Chai and snacks,682.00,EXPENSE,Chai Point,Dining,INR
+2026-06-29,Cab ride,515.00,EXPENSE,Uber,Transport,INR
+2026-06-30,Bike taxi,548.50,EXPENSE,Rapido,Transport,INR
+2026-07-01,Salary July,95000.00,INCOME,Acme Technologies,Salary,INR
+2026-07-01,Groceries,1783.00,EXPENSE,DMart,Groceries,INR
+2026-07-01,Doctor consultation,749.00,EXPENSE,Practo,Health,INR
+2026-07-02,Dinner,1066.50,EXPENSE,Truffles,Dining,INR
+2026-07-02,Metro card top-up,61.50,EXPENSE,Namma Metro,Transport,INR
+2026-07-04,Doctor consultation,888.00,EXPENSE,Practo,Health,INR
+2026-07-05,Rent July,25000.00,EXPENSE,Landlord (UPI),Rent,INR
+2026-07-06,Bike taxi,240.00,EXPENSE,Rapido,Transport,INR
+2026-07-06,Cab ride,229.00,EXPENSE,Uber,Transport,INR
+2026-07-07,Netflix subscription,649.00,EXPENSE,Netflix,Subscriptions,INR
+2026-07-09,Spotify subscription,119.00,EXPENSE,Spotify,Subscriptions,INR
+2026-07-10,Two-wheeler loan EMI,6500.00,EXPENSE,Bajaj Finance,EMI & Loans,INR
+2026-07-10,Dinner,359.50,EXPENSE,Truffles,Dining,INR
+2026-07-10,Petrol,2726.00,EXPENSE,Indian Oil,Transport,INR
+2026-07-10,Phone accessories,4289.00,EXPENSE,Flipkart,Shopping,INR
+2026-07-12,Broadband,999.00,EXPENSE,ACT Fibernet,Utilities,INR
+2026-07-12,Food delivery,543.00,EXPENSE,Zomato,Dining,INR
+2026-07-12,Auto ride,619.00,EXPENSE,Ola,Transport,INR
+2026-07-12,Freelance project payment,13247.00,INCOME,Upwork,Freelance,INR
+2026-07-13,Auto ride,191.50,EXPENSE,Ola,Transport,INR
+2026-07-14,Electricity bill,1830.00,EXPENSE,BESCOM,Utilities,INR
+2026-07-14,Metro card top-up,271.00,EXPENSE,Namma Metro,Transport,INR
+2026-07-14,Auto ride,603.00,EXPENSE,Ola,Transport,INR
+2026-07-15,Weekly groceries,2079.00,EXPENSE,BigBasket,Groceries,INR
+2026-07-15,Movie,1085.00,EXPENSE,PVR Cinemas,Entertainment,INR
+2026-07-16,Clothing,1454.00,EXPENSE,Myntra,Shopping,INR
+2026-07-17,Metro card top-up,564.00,EXPENSE,Namma Metro,Transport,INR
+2026-07-18,Mobile recharge,399.00,EXPENSE,Jio,Utilities,INR
+2026-07-20,Chai and snacks,414.50,EXPENSE,Chai Point,Dining,INR
+2026-07-20,Bike taxi,361.00,EXPENSE,Rapido,Transport,INR
+2026-07-21,Sports gear,1213.00,EXPENSE,Decathlon,Shopping,INR
+2026-07-22,Dinner,1245.50,EXPENSE,Truffles,Dining,INR
+2026-07-22,Auto ride,108.50,EXPENSE,Ola,Transport,INR
+2026-07-24,Lunch,883.00,EXPENSE,Meghana Foods,Dining,INR
+2026-07-25,Cab ride,92.50,EXPENSE,Uber,Transport,INR
+2026-07-27,Milk and essentials,1916.00,EXPENSE,Blinkit,Groceries,INR
+2026-07-27,Weekly groceries,974.00,EXPENSE,BigBasket,Groceries,INR
+2026-07-27,Cab ride,228.50,EXPENSE,Uber,Transport,INR
+2026-07-29,Quick groceries,2017.00,EXPENSE,Zepto,Groceries,INR
+2026-07-30,Dinner,382.00,EXPENSE,Truffles,Dining,INR
+2026-07-30,Coffee,987.50,EXPENSE,Third Wave Coffee,Dining,INR
+2026-07-31,Coffee,763.50,EXPENSE,Third Wave Coffee,Dining,INR
+2026-08-01,Salary August,95000.00,INCOME,Acme Technologies,Salary,INR
+2026-08-02,Freelance project payment,13106.00,INCOME,Upwork,Freelance,INR
+2026-08-03,Lunch,493.00,EXPENSE,Meghana Foods,Dining,INR
+2026-08-04,Petrol,2866.00,EXPENSE,Indian Oil,Transport,INR
+2026-08-04,Online order,589.00,EXPENSE,Amazon,Shopping,INR
+2026-08-05,Rent August,25000.00,EXPENSE,Landlord (UPI),Rent,INR
+2026-08-05,Weekly groceries,2242.00,EXPENSE,BigBasket,Groceries,INR
+2026-08-05,Bike taxi,403.00,EXPENSE,Rapido,Transport,INR
+2026-08-07,Netflix subscription,649.00,EXPENSE,Netflix,Subscriptions,INR
+2026-08-07,Chai and snacks,602.00,EXPENSE,Chai Point,Dining,INR
+2026-08-08,Quick groceries,1865.50,EXPENSE,Zepto,Groceries,INR
+2026-08-08,Dinner,1159.00,EXPENSE,Truffles,Dining,INR
+2026-08-08,Auto ride,432.00,EXPENSE,Ola,Transport,INR
+2026-08-09,Spotify subscription,119.00,EXPENSE,Spotify,Subscriptions,INR
+2026-08-10,Two-wheeler loan EMI,6500.00,EXPENSE,Bajaj Finance,EMI & Loans,INR
+2026-08-11,Bike taxi,112.00,EXPENSE,Rapido,Transport,INR
+2026-08-12,Broadband,999.00,EXPENSE,ACT Fibernet,Utilities,INR
+2026-08-12,Coffee,772.00,EXPENSE,Third Wave Coffee,Dining,INR
+2026-08-12,Auto ride,453.00,EXPENSE,Ola,Transport,INR
+2026-08-12,Auto ride,406.50,EXPENSE,Ola,Transport,INR
+2026-08-13,Dinner,1330.00,EXPENSE,Truffles,Dining,INR
+2026-08-14,Electricity bill,1795.00,EXPENSE,BESCOM,Utilities,INR
+2026-08-14,Coffee,843.50,EXPENSE,Third Wave Coffee,Dining,INR
+2026-08-14,Metro card top-up,67.00,EXPENSE,Namma Metro,Transport,INR
+2026-08-16,Weekly groceries,870.00,EXPENSE,BigBasket,Groceries,INR
+2026-08-16,Movie tickets,725.00,EXPENSE,BookMyShow,Entertainment,INR
+2026-08-18,Mobile recharge,399.00,EXPENSE,Jio,Utilities,INR
+2026-08-18,Coffee,863.00,EXPENSE,Third Wave Coffee,Dining,INR
+2026-08-18,Phone accessories,1626.00,EXPENSE,Flipkart,Shopping,INR
+2026-08-19,Coffee,313.00,EXPENSE,Third Wave Coffee,Dining,INR
+2026-08-20,Groceries,991.50,EXPENSE,DMart,Groceries,INR
+2026-08-20,Cab ride,641.50,EXPENSE,Uber,Transport,INR
+2026-08-20,Laptop,62000.00,EXPENSE,Croma,Shopping,INR
+2026-08-24,Auto ride,625.00,EXPENSE,Ola,Transport,INR
+2026-08-25,Milk and essentials,897.00,EXPENSE,Blinkit,Groceries,INR
+2026-08-27,Chai and snacks,1313.00,EXPENSE,Chai Point,Dining,INR
+2026-08-27,Doctor consultation,621.00,EXPENSE,Practo,Health,INR
+2026-08-28,Dinner,436.00,EXPENSE,Truffles,Dining,INR
+2026-08-28,Auto ride,529.00,EXPENSE,Ola,Transport,INR
+2026-09-01,Salary September,95000.00,INCOME,Acme Technologies,Salary,INR
+2026-09-01,Cab ride,573.00,EXPENSE,Uber,Transport,INR
+2026-09-03,Bike taxi,201.50,EXPENSE,Rapido,Transport,INR
+2026-09-04,Auto ride,320.00,EXPENSE,Ola,Transport,INR
+2026-09-05,Rent September,25000.00,EXPENSE,Landlord (UPI),Rent,INR
+2026-09-05,Coffee,352.00,EXPENSE,Third Wave Coffee,Dining,INR
+2026-09-07,Netflix subscription,649.00,EXPENSE,Netflix,Subscriptions,INR
+2026-09-08,Groceries,1579.00,EXPENSE,DMart,Groceries,INR
+2026-09-09,Spotify subscription,119.00,EXPENSE,Spotify,Subscriptions,INR
+2026-09-09,Lunch,789.00,EXPENSE,Meghana Foods,Dining,INR
+2026-09-09,Metro card top-up,173.00,EXPENSE,Namma Metro,Transport,INR
+2026-09-10,Two-wheeler loan EMI,6500.00,EXPENSE,Bajaj Finance,EMI & Loans,INR
+2026-09-10,Chai and snacks,1214.50,EXPENSE,Chai Point,Dining,INR
+2026-09-10,Food delivery,691.50,EXPENSE,Swiggy,Dining,INR
+2026-09-11,Chai and snacks,406.00,EXPENSE,Chai Point,Dining,INR
+2026-09-11,Metro card top-up,326.00,EXPENSE,Namma Metro,Transport,INR
+2026-09-11,Petrol,2840.00,EXPENSE,Indian Oil,Transport,INR
+2026-09-12,Broadband,999.00,EXPENSE,ACT Fibernet,Utilities,INR
+2026-09-14,Electricity bill,2022.00,EXPENSE,BESCOM,Utilities,INR
+2026-09-14,Chai and snacks,1026.00,EXPENSE,Chai Point,Dining,INR
+2026-09-14,Anniversary dinner,8400.00,EXPENSE,The Leela Palace,Dining,INR
+2026-09-17,Weekly groceries,2895.00,EXPENSE,BigBasket,Groceries,INR
+2026-09-17,Cab ride,281.00,EXPENSE,Uber,Transport,INR
+2026-09-18,Mobile recharge,399.00,EXPENSE,Jio,Utilities,INR
+2026-09-19,Metro card top-up,211.50,EXPENSE,Namma Metro,Transport,INR
+2026-09-21,Dinner,1204.00,EXPENSE,Truffles,Dining,INR
+2026-09-21,Cab ride,560.00,EXPENSE,Uber,Transport,INR
+2026-09-22,Coffee,1268.50,EXPENSE,Third Wave Coffee,Dining,INR
+2026-09-22,Sports gear,1558.00,EXPENSE,Decathlon,Shopping,INR
+2026-09-23,Auto ride,481.50,EXPENSE,Ola,Transport,INR
+2026-09-23,Phone accessories,3472.00,EXPENSE,Flipkart,Shopping,INR
+2026-09-24,Quick groceries,2531.50,EXPENSE,Zepto,Groceries,INR
+2026-09-25,Weekly groceries,3231.00,EXPENSE,BigBasket,Groceries,INR
+2026-09-25,Bike taxi,403.00,EXPENSE,Rapido,Transport,INR
+2026-09-25,Metro card top-up,241.00,EXPENSE,Namma Metro,Transport,INR
+2026-09-26,Petrol,1775.00,EXPENSE,Indian Oil,Transport,INR
+2026-09-28,Auto ride,209.00,EXPENSE,Ola,Transport,INR
+2026-09-28,Savings account interest,314.00,INCOME,HDFC Bank,Interest,INR
+2026-09-30,Milk and essentials,865.00,EXPENSE,Blinkit,Groceries,INR
+2026-10-01,Salary October,95000.00,INCOME,Acme Technologies,Salary,INR
+2026-10-01,Dinner,1342.00,EXPENSE,Truffles,Dining,INR
+2026-10-01,Food delivery,814.50,EXPENSE,Zomato,Dining,INR
+2026-10-02,Weekend trip to Goa,18000.00,EXPENSE,MakeMyTrip,Travel,INR
+2026-10-05,Rent October,25000.00,EXPENSE,Landlord (UPI),Rent,INR
+2026-10-07,Netflix subscription,649.00,EXPENSE,Netflix,Subscriptions,INR
+2026-10-09,Spotify subscription,119.00,EXPENSE,Spotify,Subscriptions,INR
+2026-10-10,Two-wheeler loan EMI,6500.00,EXPENSE,Bajaj Finance,EMI & Loans,INR
+2026-10-12,Broadband,999.00,EXPENSE,ACT Fibernet,Utilities,INR
+2026-10-12,Quick groceries,1106.00,EXPENSE,Zepto,Groceries,INR
+2026-10-12,Cab ride,412.00,EXPENSE,Uber,Transport,INR
+2026-10-13,Auto ride,147.00,EXPENSE,Ola,Transport,INR
+2026-10-14,Electricity bill,2596.00,EXPENSE,BESCOM,Utilities,INR
+2026-10-14,Lunch,295.00,EXPENSE,Meghana Foods,Dining,INR
+2026-10-14,Clothing,2722.00,EXPENSE,Myntra,Shopping,INR
+2026-10-15,Food delivery,1036.00,EXPENSE,Swiggy,Dining,INR

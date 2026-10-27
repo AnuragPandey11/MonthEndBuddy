@@ -1,0 +1,25 @@
+# Integration tests (support/IntegrationTest). Rate limits are loose so tests can register many users from one IP;
+# AuthRateLimitIT tightens them for itself.
+meb:
+  agent:
+    provider: scripted
+  auth:
+    jwt-secret: test-only-secret-0123456789abcdef-0123456789abcdef
+    allowed-origins: http://localhost:8080
+  ratelimit:
+    limits:
+      login:
+        - { capacity: 10000, period: 1m }
+      register:
+        - { capacity: 10000, period: 1m }
+      agent-chat:
+        - { capacity: 10000, period: 1m }
+      provider-global:
+        - { capacity: 10000, period: 1m }
+      provider-tokens:
+        - { capacity: 10000000, period: 1m }
+
+logging:
+  structured:
+    format:
+      console: ""

@@ -931,6 +931,9 @@ classDiagram
     class AffordabilityResult {
         <<record>>
         +AffordabilityVerdict verdict
+        +Money currentSavings
+        +Money savingsSetAside
+        +Money availableSavings
         +Money savingsAfterPurchase
         +Money monthlySurplus
         +Money goalNeed
@@ -1001,6 +1004,8 @@ classDiagram
 | `goalIds` | All active goals are used |
 
 `AffordabilityResult.recoveryMonths` is null when it can never be reached.
+
+**As built (P2.7):** `AffordabilityResult` also carries `dataQuality`, a list of `{code, message}` with the codes `MISSING_INPUT`, `LOW_DATA` and `DEADLINE_PASSED`. These describe how complete the data is, so they are kept apart from `AssumptionLabel`, which only says where a value came from. It also reports every input (savings, average income and expenses, buffer, goal need, surplus) and a `delayMonths` for each goal.
 
 **`UserScopedCache.getOrLoad`:**
 
@@ -1542,6 +1547,18 @@ classDiagram
 
 `ProposedAction`s are **never executed by the backend agent**. The UI shows each one as a button that opens a pre-filled form, and saving that form calls the normal REST endpoint (`POST /budgets`, …).
 
+**Where proposals come from (decided in P3.4).** Tools derive them deterministically from their own results, never from the model's text:
+
+| Tool result | Proposal | Payload (REST request shape) |
+|---|---|---|
+| `getExpensesByCategory`: the largest category that has no budget, skipping the fixed-cost system categories (Rent, Utilities, Insurance, EMI & Loans) | `CREATE_BUDGET`, "Set a monthly budget for Dining" | `categoryId`, `categoryName`, `limit` = the period's monthly average rounded up to the next ₹500 |
+| `getBudgetStatus`: each overspent budget | `UPDATE_BUDGET`, "Review the Dining budget" | `budgetId`, `categoryName`, `limit` = spent so far rounded up to the next ₹500 |
+| `calculateSavingsProjection` for an unsaved target (no `goalId`) | `CREATE_GOAL`, "Save this as a goal" | `targetAmount`, `currentAmount`, `targetDate` |
+
+`UPDATE_GOAL_CONTRIBUTION` stays in the enum but is not produced: goals store no monthly contribution, so there is no endpoint to save one to.
+
+**Grounding check (architecture §10.6).** `ResponseAssembler` passes every `COMPLETE` answer through `GroundingCheck`. That check lists the money amounts in the answer (₹, Rs, INR; lakh, crore and k suffixes) that match no number in the turn's tool results, tool arguments or the user's message, at the precision the answer shows. The list goes out as `AgentResponse.unverifiedAmounts`, and the UI marks those amounts "estimate — not from your data". The LLD's `Evidence.verified` flag was replaced by this response-level list, plus `Evidence.truncated`.
+
 ---
 
 ## 9. notifications + infrastructure
@@ -1662,10 +1679,11 @@ classDiagram
 | **BudgetService** | budgets | Budget CRUD | `list`, `create`, `update`, `delete` | REST `/budgets` | @Tx | — (bumps cache gen) |
 | **BudgetStatusService** | budgets | Spent / remaining / % / thresholds / evidence txns | `getStatus(u, month)`, `getStatus(u, budgetId, month)` | REST `/budgets/status`; Tool `getBudgetStatus`; BudgetThresholdHandler | RO | — |
 | **GoalService** | goals | Savings goal CRUD | `list`, `create`, `update`, `delete` | REST `/goals` | @Tx | — (bumps cache gen) |
-| **SavingsProjectionService** | goals | Required contribution, completion month, series, what-if | `project`, `projectGoal`, `requiredMonthlyForActiveGoals` | REST `/goals/*/projection`; Tool `calculateSavingsProjection`; AffordabilityService | RO | — |
+| **SavingsProjectionService** | goals | Required contribution, completion month, series, what-if, money held by active goals | `project`, `projectGoal`, `requiredMonthlyForActiveGoals`, `savedInActiveGoals` | REST `/goals/*/projection`; Tool `calculateSavingsProjection`; AffordabilityService | RO | — |
 | **SummaryService** | analytics | Monthly summary, category breakdown, trends, averages | `monthlySummary`, `categoryBreakdown`, `trends`, `averages` | REST `/analytics/*`; Tools `getMonthlySummary`, `getExpensesByCategory`; AffordabilityService | RO (cached) | — |
 | **ComparisonService** | analytics | Month-over-month by category | `compare` | REST `/analytics/compare`; Tool `compareMonthlySpending` | RO (cached) | — |
 | **AffordabilityService** | analytics | Purchase simulation with labelled assumptions | `simulate` | REST `/simulations/purchase`; Tool `simulatePurchase` | RO | — |
+| **MonthReviewService** | analytics | Last month's review: what it kept, and adding it to savings and goals once (arch §9.6) | `lastMonth`, `complete` | REST `/month-review` | @Tx (one transaction with the savings and goal writes) | — (the writes bump cache gen) |
 | **AnomalyService** | analytics | Run rules, store alerts, list / resolve alerts | `evaluateTransaction`, `listAlerts`, `resolve` | REST `/alerts`; Tool `findUnusualTransactions`; AnomalyHandler | @Tx | `AnomalyDetected` |
 | **ConversationService** | agent | Conversation + message persistence, history window | `getOrStart`, `history`, `appendUser`, `appendAssistant`, `list`, `get`, `delete` | AgentOrchestrator; REST `/agent/conversations` | @Tx | — |
 | **AgentOrchestrator** | agent | Tool loop, limits, timeouts, response assembly | `run` | AgentController | per-step (no long Tx across LLM calls) | — |
@@ -1706,6 +1724,7 @@ classDiagram
 | `BudgetController` | `/budgets` | BudgetService, BudgetStatusService |
 | `GoalController` | `/goals` | GoalService, SavingsProjectionService |
 | `SimulationController` | `/simulations` | AffordabilityService |
+| `MonthReviewController` | `/month-review` | MonthReviewService |
 | `AlertController` | `/alerts` | AnomalyService |
 | `NotificationController` | `/notifications` | NotificationService |
 | `AgentController` | `/agent` | AgentOrchestrator, ConversationService |
@@ -1759,6 +1778,7 @@ classDiagram
 | `PurchaseSimulationInput` | `@Positive purchaseAmount`, `purchaseMonth`, `currentSavingsOverride`, `goalIds` |
 | `ChatRequest` | `conversationId` (optional), `@NotBlank @Size(max=2000) message` |
 | `ResolveAlertCommand` | `@NotNull status` ∈ {`DISMISSED`, `EXPECTED`} |
+| `MonthReviewRequest` | `@NotNull month` (last month only), `@PositiveMoney addToSavings` (optional), `@Size(max=10) goalContributions[{@NotNull goalId, @PositiveMoney amount}]` (optional, distinct goals) |
 
 ### 11.3 Views / results (REST + tool output)
 
@@ -1778,6 +1798,7 @@ classDiagram
 | `SavingsProjection` | see §6 |
 | `AffordabilityResult` | see §7.1 |
 | `AlertView` | `id, ruleId, subject, periodStart, severity, explanation, status, createdAt` |
+| `MonthReviewView` | `month, kept, transactionCount, status` (`DUE`, `NOTHING_KEPT`, `DONE`, `SKIPPED`)`, currentSavings, currentSavingsUpdatedAt, savingsUpdatedSinceMonthEnd, addedToSavings, setAsideForGoals` |
 | `AgentResponse` | see §8.3 |
 
 ---
@@ -1840,7 +1861,7 @@ classDiagram
 | `NotFoundException` | 404 | `not_found` | `findByIdAndUserId` empty — also for other users' IDs |
 | `ValidationException` | 422 | `validation_failed` | Bean Validation, CSV header, range > 24 months |
 | `UnsupportedCurrencyException` | 422 | `unsupported_currency` | Non-base currency |
-| `ConflictException` | 409 | `version_conflict` / `turn_in_progress` | Optimistic lock, `AgentTurnLock` |
+| `ConflictException` | 409 | `version_conflict` / `turn_in_progress` / `month_already_reviewed` | Optimistic lock, `AgentTurnLock`, a second month-end review |
 | `IllegalStateTransitionException` | 409 | `invalid_state` | `ImportJob.discard()` after commit |
 | `UnauthorizedException` | 401 | `invalid_credentials` / `token_expired` / `token_reused` | Auth |
 | `RateLimitedException` | 429 | `rate_limited` + `Retry-After` | `RateLimitFilter` |

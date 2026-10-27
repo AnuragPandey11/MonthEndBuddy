@@ -1,0 +1,18 @@
+# Local development: readable logs and API docs at http://localhost:8081/swagger-ui.html
+logging:
+  structured:
+    format:
+      console: ""
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+meb:
+  auth:
+    # Local development only. Real deployments set JWT_SECRET (see .env.example).
+    jwt-secret: ${JWT_SECRET:local-development-only-secret-not-for-production}
+    # The Vite dev server (P1.6) as well as nginx.
+    allowed-origins: ${APP_BASE_URL:http://localhost:8080},http://localhost:5173
