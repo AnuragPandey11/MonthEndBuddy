@@ -67,7 +67,7 @@ export function BudgetsPage() {
       />
 
       {status.isPending ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Skeleton className="h-40" />
           <Skeleton className="h-40" />
         </div>
@@ -80,7 +80,7 @@ export function BudgetsPage() {
           action={<Button onClick={() => setEditing({ open: true, budget: null })}>Add budget</Button>}
         />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {status.data.budgets.map((b) => (
             <BudgetCard
               key={b.budgetId}

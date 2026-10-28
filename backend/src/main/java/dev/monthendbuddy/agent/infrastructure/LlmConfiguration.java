@@ -1,5 +1,8 @@
 package dev.monthendbuddy.agent.infrastructure;
 
+import java.time.Duration;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
@@ -15,10 +18,15 @@ import dev.monthendbuddy.agent.llm.LlmGateway;
 @Configuration(proxyBeanMethods = false)
 class LlmConfiguration {
 
+	/**
+	 * With {@code meb.agent.scripted-demo=true} (off by default, and never in tests) a turn with nothing queued runs
+	 * the offline demo script instead of reporting the provider as unavailable.
+	 */
 	@Bean
 	@ConditionalOnProperty(name = "meb.agent.provider", havingValue = "scripted")
-	ScriptedLlmGateway scriptedLlmGateway() {
-		return new ScriptedLlmGateway();
+	ScriptedLlmGateway scriptedLlmGateway(@Value("${meb.agent.scripted-demo:false}") boolean demo,
+			@Value("${meb.agent.scripted-demo-delay:2s}") Duration delay) {
+		return demo ? new ScriptedLlmGateway(delay) : new ScriptedLlmGateway();
 	}
 
 	/**

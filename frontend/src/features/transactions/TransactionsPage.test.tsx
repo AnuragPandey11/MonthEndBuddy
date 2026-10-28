@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { inr, renderPage } from '../../test/render'
 import type { Transaction } from '../../lib/api/types'
 import { TransactionsPage } from './TransactionsPage'
+import { expectNoSeriousA11yViolations } from '../../test/axe'
 
 const rent = {
   id: 't1',
@@ -41,6 +42,15 @@ function renderTransactions(path: string) {
 describe('TransactionsPage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
+  it('has no serious accessibility violations, list and add form', async () => {
+    renderTransactions('/transactions')
+    await screen.findAllByRole('button', { name: /^Edit Rent/ })
+    await expectNoSeriousA11yViolations()
+    await userEvent.click(screen.getByRole('button', { name: /add transaction/i }))
+    await screen.findByRole('dialog', { name: 'Add transaction' })
+    await expectNoSeriousA11yViolations()
+  })
+
   it('opens the add form from the top bar link', async () => {
     renderTransactions('/transactions?new=1')
 
@@ -54,7 +64,7 @@ describe('TransactionsPage', () => {
   it('lists transactions as a table and as cards, both opening the same form', async () => {
     renderTransactions('/transactions')
 
-    const [inTable, inCard] = await screen.findAllByRole('button', { name: 'Edit Rent' })
+    const [inTable, inCard] = await screen.findAllByRole('button', { name: /^Edit Rent/ })
     expect(screen.getByRole('columnheader', { name: 'Amount' })).toBeInTheDocument()
     expect(inCard).toHaveTextContent('Housing')
     await userEvent.click(inTable!)

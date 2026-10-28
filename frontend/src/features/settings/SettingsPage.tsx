@@ -101,7 +101,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
       className="flex flex-col gap-5"
       onChange={() => setSaved(false)}
     >
-      <fieldset className="grid gap-4 sm:grid-cols-2">
+      <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <legend className="mb-2 text-sm font-semibold">Your money</legend>
         <Field
           label="Savings today (₹)"
@@ -140,7 +140,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
           )}
         </Field>
       </fieldset>
-      <fieldset className="grid gap-4 sm:grid-cols-3">
+      <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <legend className="mb-2 text-sm font-semibold">Alerts</legend>
         <Field label="Large purchase from (₹)" error={e.largeTxnThreshold?.message}>
           {(a11y) => (

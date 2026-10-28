@@ -10,7 +10,7 @@ interface MonthPickerProps {
 /** The page's one filter (dataviz: one row, above everything it scopes). Future months are not selectable. */
 export function MonthPicker({ value, max, onChange }: MonthPickerProps) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-pill border border-line bg-surface p-1 shadow-card">
+    <div className="inline-flex items-center gap-1 rounded-pill border border-line bg-surface p-1 shadow-card has-[input:focus]:outline-2 has-[input:focus]:outline-offset-2 has-[input:focus]:outline-focus">
       <button
         type="button"
         onClick={() => onChange(addMonths(value, -1))}
@@ -28,7 +28,7 @@ export function MonthPicker({ value, max, onChange }: MonthPickerProps) {
           onChange={(event) =>
             event.target.value && onChange(event.target.value <= max ? event.target.value : max)
           }
-          className="w-40 rounded-pill bg-transparent px-2 py-1 text-center text-sm text-ink focus:outline-none"
+          className="w-40 rounded-pill bg-transparent px-2 py-1 text-center text-sm text-ink"
           aria-description={formatMonth(value)}
         />
       </label>

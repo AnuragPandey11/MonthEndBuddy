@@ -2,6 +2,7 @@ package dev.monthendbuddy.analytics.application;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -44,6 +45,11 @@ class AnomalyHandler extends IdempotentHandler {
 		this.anomalies = anomalies;
 		this.contexts = contexts;
 		this.transactions = transactions;
+	}
+
+	@Override
+	public Set<Class<? extends DomainEvent>> eventTypes() {
+		return Set.of(TransactionCreated.class, TransactionUpdated.class, TransactionDeleted.class, TransactionsImported.class);
 	}
 
 	@Override

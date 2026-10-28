@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { inr, renderPage } from '../../test/render'
 import { MonthReviewCard } from './MonthReviewCard'
+import { expectNoSeriousA11yViolations } from '../../test/axe'
 
 const due = {
   month: '2026-09',
@@ -40,6 +41,12 @@ function reviewPost(fetchMock: ReturnType<typeof renderPage>) {
 
 describe('MonthReviewCard', () => {
   afterEach(() => vi.unstubAllGlobals())
+
+  it('has no serious accessibility violations', async () => {
+    renderPage(<MonthReviewCard />, { 'GET /api/v1/month-review': due, 'GET /api/v1/goals': goals })
+    await screen.findByLabelText('Set aside for a goal (optional)')
+    await expectNoSeriousA11yViolations()
+  })
 
   it('stays hidden when nothing is due', async () => {
     const fetchMock = renderPage(<MonthReviewCard />, {

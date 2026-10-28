@@ -788,7 +788,7 @@ Added at the owner's request after P4.3. People could not tell "Savings today" (
   - **Tests:** `MonthReviewApiIT` (6), a body-reference isolation test in `UserIsolationIT`, the calculator and affordability ITs, and `MonthReviewCard.test.tsx` (5).
 - **Verified:** the full backend build and the frontend checks pass. The new endpoints were called against the real backend as the demo user. The review card was screenshotted against the mock API.
 
-### P4.4 Shader · M — S§7, A§14
+### P4.4 Shader · M — S§7, A§14 · ✅ done 2026-10-28
 
 - `AuroraBackground` appears only behind the hero card and the copilot header. It:
   - is lazy-loaded;
@@ -798,8 +798,20 @@ Added at the owner's request after P4.3. People could not tell "Savings today" (
 - It falls back to a CSS gradient when reduced motion is set, WebGL is unavailable, or the frame rate stays below 30 fps for 2 seconds.
 - Text never sits directly on the shader.
 - Record the choice between a maintained library and a small Three.js implementation in an ADR.
+- *As built* ([ADR 0002](adr/0002-aurora-shader-in-raw-webgl.md)):
+  - **Neither:** raw WebGL 1, with no new dependency. The shader is a 4.7 KB lazy chunk (2.4 KB gzipped), and nothing enters the main bundle.
+  - **Files in `components/aurora/`:**
+    - `auroraRenderer.ts`, the framework-free renderer (one triangle, a value-noise fragment shader, the theme tokens as uniforms);
+    - `fpsWatchdog.ts`, which ignores a 500 ms warm-up, then drops the shader for good after one 2-second window below 30 fps;
+    - `AuroraCanvas.tsx`, loaded through `React.lazy`. It creates its own canvas inside the effect, pauses on `visibilitychange` and `IntersectionObserver`, follows `data-theme`, and treats `webglcontextlost` as a fallback;
+    - `AuroraBackground.tsx`, with the `.aurora-fallback` gradient always underneath.
+  - **Placement:** only behind the hero's pixel chart and the copilot's robot tile, so no text ever sits on it.
+  - **Tests:**
+    - `fpsWatchdog.test.ts` (4);
+    - `AuroraBackground.test.tsx`: the gradient without WebGL; no `getContext` call under reduced motion; the fallback when no context can be created.
+  - **In a browser** (P4.5 review): a canvas is present with motion allowed and absent with reduced motion, at both widths and in both themes, with no CSP violations.
 
-### P4.5 Accessibility and responsive pass · M — S§7
+### P4.5 Accessibility and responsive pass · M — S§7 · ✅ done 2026-10-28 (Phase 4 exit check passed)
 
 - Run axe checks in component tests.
 - Check keyboard navigation, visible focus, token contrast, reduced motion, tables on narrow screens and mobile navigation.
@@ -807,6 +819,32 @@ Added at the owner's request after P4.3. People could not tell "Savings today" (
   - Review the app at desktop and phone widths, with reduced motion both on and off.
   - axe reports no serious violations.
   - The copilot streams tool status, through nginx as well: `curl -N` against :8080 with the scripted provider shows `tool_started` before the turn ends, not all events in one burst at the end.
+- *As built:*
+  - **axe in component tests:**
+    - `axe-core` 4.14.0 and `test/axe.ts` (`expectNoSeriousA11yViolations`). `color-contrast` is off in jsdom, which has no styles, and `landmark-unique` is off because CSS hides one of the two "Main" navs per breakpoint.
+    - `test/axe.test.tsx` proves the helper can fail.
+    - Covered: AppShell (with a panel open), Overview, Transactions (list and add form), Goals (with a purchase check), Settings, Login (with errors), Copilot (empty and answered), MonthReviewCard and Dialog.
+  - **Token contrast:** `styles.contrast.test.ts` computes WCAG ratios from `styles.css` for both themes (56 checks): text on every surface, status colours on every surface and on their own tinted pills, white on the primary button, focus and data marks at 3:1. It found, and the tokens now fix:
+    - light `faint`, `#717683` → `#676b78`; dark `faint`, `#848995` → `#8b909c`;
+    - light `positive`, `#15824a` → `#11703f`; `negative`, `#d22f25` → `#bd281f`; `warning`, `#a2620a` → `#8f5607`.
+  - **Fixed from the review:**
+    - `Dialog` traps focus (Tab and Shift+Tab wrap; `Dialog.test.tsx`).
+    - `focus:outline-none` is gone, so the global 2px ring shows. The month picker draws its ring on the wrapper (`has-[input:focus]`), because Chrome focuses the month field's inner segments.
+    - Grids without a base column template overflowed at 390 px (Goals was 463 px wide): every responsive grid now starts at `grid-cols-1`.
+    - Accessible names now contain the visible text (`label-content-name-mismatch`): `DataList` reads an `sr-only` verb ("Edit") before the row text instead of an `aria-label`, and the account button is "{name}, your account" with CSS-drawn initials.
+    - The Import CSV and Add transaction labels are `max-sm:sr-only`, not `hidden`, so they keep a name on phones.
+    - The dimmed paise in figures went from `opacity-55` to `opacity-70`, and dimmed text on the dark panel to `/75` or `/80`.
+    - A `HydrateFallback` silences React Router's warning.
+  - **Offline demo provider:** for the stream check, `meb.agent.scripted-demo` (`MEB_AGENT_SCRIPTED_DEMO`, off by default and in tests) makes the scripted provider answer every question with one real `getMonthlySummary` call and a fixed reply after `scripted-demo-delay` (2 s). Compose passes `MEB_AGENT_PROVIDER` and `MEB_AGENT_SCRIPTED_DEMO` through. `ScriptedLlmGatewayTest` (3).
+  - **Exit check (2026-10-28), against `docker compose up --build` on :8080 with `MEB_AGENT_PROVIDER=scripted MEB_AGENT_SCRIPTED_DEMO=true`:**
+    - **Stream through nginx:** `curl -N` timestamps were `tool_started` at 0.04 s, `tool_finished` at 0.06 s and `final` at 2.09 s, so the events arrive as they happen.
+    - **Browser review:** Playwright 1.64.1, run from a scratch folder (it joins the repo in P6.1), drove Chrome through the demo login. It covered 7 pages, desktop (1440 px) and phone (390 px), light and dark, with reduced motion on and off: 8 combinations.
+    - **axe in the browser** (contrast included, under the real CSP): **0 serious or critical** violations on every page in every combination.
+    - **No horizontal overflow, no CSP violations, no page errors.** The only console message is the expected 401 from the signed-out refresh on /login.
+    - **Keyboard:** every focusable element in the top bar and on the Overview shows a 2px ring.
+    - **Copilot:** it answered through the stream in about 2.3 s.
+    - **Shader:** present only when motion is allowed.
+    - The scripted provider's turns count against the shared provider budget (6,000 tokens a minute), which admits about two demo turns a minute. That is by design for Groq; the review spaces its turns accordingly.
 
 ---
 
@@ -814,14 +852,19 @@ Added at the owner's request after P4.3. People could not tell "Savings today" (
 
 **Exit (S§13):** asynchronous features are tested and recover cleanly from retries and duplicate messages.
 
-### P5.1 Compose `full` profile · S — A§3
+### P5.1 Compose `full` profile · S — A§3 · ✅ done 2026-10-28
 
 - Add `redis:7` and a single-node KRaft `apache/kafka`, both with healthchecks. Add `kafka-ui` under the `tools` profile.
 - Create `infra/env/full.env` (I11).
 - Readiness includes Kafka when `events.mode=kafka`.
 - Add the Testcontainers Redis and Kafka modules to the test base.
+- *As built:*
+  - Run with `MEB_STACK=full COMPOSE_PROFILES=full docker compose up --build`. The backend's `env_file` is `infra/env/${MEB_STACK:-core}.env`, and it `depends_on` redis and kafka with `required: false`, so the core stack is unchanged.
+  - `redis:7.4-alpine` with no persistence; `apache/kafka:4.2.2`, single-node KRaft, **auto-create topics off**; `kafbat/kafka-ui:v1.4.2` on host port 8085 under `tools`. All have healthchecks.
+  - Readiness is `${MEB_READINESS_INCLUDE:readinessState,db}`; `full.env` adds `kafka`. Redis never gates readiness and its health indicator is off.
+  - Images are pinned in `pom.xml` (`redis.image`, `kafka.image`) and passed to Failsafe. Test bases: `RedisIntegrationTest`, `KafkaIntegrationTest` (each its own cached context).
 
-### P5.2 Redis cache · M — A§11.1, L§7.1
+### P5.2 Redis cache · M — A§11.1, L§7.1 · ✅ done 2026-10-28
 
 - A Redis `CacheGenerationService` that runs `INCR` after commit.
 - A Redis `UserScopedCache`:
@@ -835,16 +878,18 @@ Added at the owner's request after P4.3. People could not tell "Savings today" (
   - After a write, the next read misses.
   - Results stay correct when Redis stops mid-test.
   - A write that commits during a load does not leave a stale value under the new generation.
+- *As built:* `RedisCacheGenerationService` and `RedisUserScopedCache` in `common/cache`, on with `meb.cache.enabled=true`. A failed `INCR` marks the user stale for TTL + jitter, and reads bypass the cache until a bump succeeds (A§11.1). Lettuce rejects commands while disconnected, with 250 ms timeouts. Tests: `RedisCacheIT` (3) and `RedisOutageIT` (Redis paused through the Docker API: correct figures within 3 s, no stale read after unpause, plus limiter and lock fallback).
 
-### P5.3 Redis rate limits and turn lock · S — A§11.2, A§11.3
+### P5.3 Redis rate limits and turn lock · S — A§11.2, A§11.3 · ✅ done 2026-10-28
 
 - Bucket4j with a Redis backend, falling back to the in-memory limiter.
 - `AgentTurnLock` uses `SET NX EX 60`.
 - **Tests:** the fallback during a Redis outage; the lock is released on every path through the turn.
+- *As built:* `RedisRateLimiter` (Bucket4j 8.21.0, `bucket4j_jdk17-lettuce`) retries once on a fresh connection, then falls back to memory and backs off for 2 s. `AgentTurnLock` keeps its API: `SET NX EX` with a token, released by a Lua compare-and-delete, falling back to memory on error. Tests: `RedisRateLimitIT` (3).
 
-### P5.4 Outbox and Kafka · L — A§12, L§2
+### P5.4 Outbox and Kafka · L — A§12, L§2 · ✅ done 2026-10-28
 
-- Migration `V10`.
+- Migration `V11` (`V10` became `month_reviews` in P4.3a).
 - `OutboxEventPublisher` writes in the caller's transaction.
 - `OutboxRelay`:
   - runs `@Scheduled` every 500 ms;
@@ -863,10 +908,18 @@ Added at the owner's request after P4.3. People could not tell "Savings today" (
   - A poison message lands in the DLT.
   - A relay crash after the send but before `published_at` is set causes a harmless re-delivery.
   - Events for one user stay in order.
+- *As built:*
+  - `common/events/kafka`: `EventCodec`, `EventTypes`, `OutboxEventPublisher` (`MANDATORY`), `OutboxRelay`, `KafkaEventConsumer` and `KafkaEventsConfiguration` (codec, topics with their `.DLT`, the error handler, the `kafka` health indicator), all active only with `meb.events.mode=kafka`. Each module declares its `EventType` beans in its `events` package. A§12.2 and A§12.3 describe the design as built.
+  - The envelope writes decimals as strings and `Money` at storage scale, so values read back exactly. `EventCodecTest` caught both losses (`84.50` came back as `84.5`; the 2-place API format dropped paise fractions).
+  - `IdempotentHandler.deliver`, `consumer` and `consumerGroup` are **not** `final`: the handlers are CGLIB proxies, and a final method would run on the proxy, whose fields are null.
+  - `OutboxRelay.relay()` is `synchronized`, so the crash test can hold the scheduled pass off while it sends a committed row without stamping it.
+  - **Both modes:** `BudgetThresholdIT`, `AnomalyApiIT` and `PlantedAnomaliesIT` are now thin subclasses of `*Scenario` bases, each with a `*KafkaIT` twin. Kafka variants observe events through the outbox and re-deliver by sending the record again. `IntegrationTest.awaitEventsHandled()` does nothing in-process; in Kafka mode (`KafkaTestEvents`) it waits until the outbox is sent and every consumer group has committed to the end of its topics, and it also runs after each test. `AnomalyHandlerFailureIT` stays in-process only.
+  - `KafkaEventsIT` (4): a duplicate raises no second alert or notification; a poison message reaches the DLT in under 1 s (so it was not retried) with `PoisonEventException` in its headers; a relay crash before the stamp sends the row twice and the side effects happen once; one user's 8 events are handled in write order.
+  - The test broker, like Compose, does not auto-create topics.
 
-### P5.5 Notifications · M — L§9
+### P5.5 Notifications · M — L§9 · ✅ done 2026-10-28
 
-- Migration `V11`.
+- Migration `V12`.
 - `Notification`, which is unique on `sourceEventId`.
 - `NotificationService` and `NotificationHandler`, which handles `BudgetThresholdReached`, `AnomalyDetected` and `TransactionsImported`.
 - `/notifications` and `/notifications/{id}/read`.
@@ -876,6 +929,17 @@ Added at the owner's request after P4.3. People could not tell "Savings today" (
   - The `full` profile runs the demo end to end.
   - The idempotency and DLT tests pass.
   - Stopping Redis only slows the app down.
+- *As built:*
+  - `V12__notifications.sql`; `NotificationService` (list the latest 50, `markRead`, `createFromEvent`, and the demo reset); `NotificationRepository` on `JdbcClient` with `ON CONFLICT (source_event_id) DO NOTHING`, like `AlertRepository`; `NotificationHandler` (`meb-notifications.inbox`), listening after commit in-process and in the `meb-notifications` group in Kafka mode.
+  - `NotificationTemplates` builds the text from the event alone, because the module sees only `events` packages: "Budget 80% used" / "Budget used up" with the amounts, month and %, linking to `/budgets`; "Unusual spending" per rule, linking to `/`; "Import complete" with the count and dates, linking to `/transactions`. A demo reseed (`aggregateId` = the user) notifies nothing, and neither does a threshold crossed in a month before the user's current one: an imported or reseeded history fires one per past month, which gave the demo account 31 unread notifications on startup. Rupees use lakh grouping written out by hand, because the JDK's `en-IN` format groups in threes. `AlertMessages` still uses the JDK format, so alerts of ₹1 lakh or more read `₹126,750.00`.
+  - `GET /api/v1/notifications?unreadOnly=` and `POST /api/v1/notifications/{id}/read` (404 for another user's; reading twice keeps the first time). Isolation row and list check added to `UserIsolationIT`.
+  - **Frontend:** the top-bar bell now shows notifications, not open alerts, which stay on the Overview. The count is unread notifications; opening one marks it read and goes to its link. The list refreshes every minute (Kafka mode is asynchronous), and `useInvalidateFinance` invalidates `['notifications']`.
+  - Tests: `NotificationTemplatesTest` (6), `NotificationsApiIT` and `NotificationsApiKafkaIT` (3 each), AppShell (10).
+- **Phase 5 exit check (2026-10-28), passed,** against `MEB_STACK=full COMPOSE_PROFILES=full MEB_AGENT_PROVIDER=scripted MEB_AGENT_SCRIPTED_DEMO=true docker compose up --build`, through nginx on :8080:
+  - **Startup:** V11 and V12 applied; both consumer groups were assigned their partitions; readiness (with `kafka`) was UP; the demo reseed at startup went through the outbox.
+  - **Demo end to end:** demo login, then the month summary, alerts and notifications. A ₹30,000 expense returned 201, and its "Budget used up" and anomaly notifications had arrived through Kafka within 2 s. The copilot streamed `tool_started`, `tool_finished` and `final`.
+  - **Redis stopped** (`docker compose stop redis`), 30 summary requests each: median 5.9 ms with Redis up (cache hit; the `g0:summary` key was present), 4.2 ms while stopped, 4.5 ms after a restart. All were 200 with identical figures. While Redis was down, demo login (200, rate limits in memory) and a write (201, 16 ms) worked, and the summary showed the new total, both during the outage and after Redis returned. On this data a cache miss costs no more than a hit, so the outage did not measurably slow the app.
+  - Final run: backend 181 unit + 199 IT (1 skipped), frontend 150 tests, with lint, format, type-check and build clean.
 
 ---
 

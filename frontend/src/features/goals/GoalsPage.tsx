@@ -60,7 +60,7 @@ export function GoalsPage() {
           action={<Button onClick={() => setEditing({ open: true, goal: null })}>Add goal</Button>}
         />
       ) : (
-        <div className="grid gap-5 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
           <ul className="flex flex-col gap-3 lg:col-span-2" aria-label="Goals">
             {goals.data.map((g) => (
               <li key={g.id}>

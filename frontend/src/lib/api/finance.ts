@@ -11,6 +11,7 @@ import type {
   MonthlySummary,
   MonthReview,
   MoneyDto,
+  Notification,
   PeriodComparison,
   SavingsProjection,
   Settings,
@@ -103,10 +104,31 @@ export function useInvalidateFinance() {
         ['budgets'],
         ['goals'],
         ['alerts'],
+        ['notifications'],
         ['settings'],
         ['month-review'],
       ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     )
+}
+
+/**
+ * The latest notifications, newest first. With Kafka events (the `full` stack) they arrive a moment after the write
+ * that caused them, so the list also refreshes every minute.
+ */
+export function useNotifications() {
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: ({ signal }) => api<Notification[]>('/api/v1/notifications', { signal }),
+    refetchInterval: 60_000,
+  })
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<Notification>(`/api/v1/notifications/${id}/read`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  })
 }
 
 export function useResolveAlert() {

@@ -21,8 +21,11 @@ interface DataListProps<T> {
   rowKey: (row: T) => string
   /** Makes each row open something; the title cell (table) and the whole card (narrow) become buttons. */
   onSelect?: (row: T) => void
-  /** The accessible name of a row's button, e.g. "Edit Groceries". */
-  selectLabel?: (row: T) => string
+  /**
+   * The verb that starts a row button's accessible name, e.g. "Edit". It is read before the visible text rather than
+   * replacing it, so the name always contains what is on screen (WCAG 2.5.3, axe label-content-name-mismatch).
+   */
+  selectVerb?: string
 }
 
 const cardClass =
@@ -32,7 +35,7 @@ const cardClass =
  * A table on wide screens and a list of cards on narrow ones (spec §7), from one column definition. Both are in the
  * DOM and CSS shows one, so the content is identical at every width.
  */
-export function DataList<T>({ rows, columns, rowKey, onSelect, selectLabel }: DataListProps<T>) {
+export function DataList<T>({ rows, columns, rowKey, onSelect, selectVerb }: DataListProps<T>) {
   const tableColumns = columns.filter((c) => c.table !== false)
   const inCard = (slot: Column<T>['card']) => columns.filter((c) => c.card === slot)
   const cardContent = (c: Column<T>, row: T) => (c.cardCell ?? c.cell)(row)
@@ -66,8 +69,12 @@ export function DataList<T>({ rows, columns, rowKey, onSelect, selectLabel }: Da
                       type="button"
                       onClick={() => onSelect(row)}
                       className="text-left hover:text-accent"
-                      aria-label={selectLabel?.(row)}
                     >
+                      {selectVerb && (
+                        <>
+                          <span className="sr-only">{selectVerb}</span>{' '}
+                        </>
+                      )}
                       {c.cell(row)}
                     </button>
                   ) : (
@@ -109,12 +116,12 @@ export function DataList<T>({ rows, columns, rowKey, onSelect, selectLabel }: Da
           return (
             <li key={rowKey(row)}>
               {onSelect ? (
-                <button
-                  type="button"
-                  onClick={() => onSelect(row)}
-                  className={cardClass}
-                  aria-label={selectLabel?.(row)}
-                >
+                <button type="button" onClick={() => onSelect(row)} className={cardClass}>
+                  {selectVerb && (
+                    <>
+                      <span className="sr-only">{selectVerb}</span>{' '}
+                    </>
+                  )}
                   {content}
                 </button>
               ) : (

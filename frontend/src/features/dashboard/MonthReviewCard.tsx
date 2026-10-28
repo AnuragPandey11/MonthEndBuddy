@@ -93,7 +93,7 @@ function ReviewForm({ review, onFinished }: { review: MonthReview; onFinished: (
 
         <form
           noValidate
-          className="grid gap-4 md:grid-cols-2"
+          className="grid grid-cols-1 gap-4 md:grid-cols-2"
           onSubmit={(event: FormEvent) => {
             event.preventDefault()
             submit(false)

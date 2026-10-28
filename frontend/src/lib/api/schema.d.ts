@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/month-review": {
         parameters: {
             query?: never;
@@ -388,6 +404,22 @@ export interface paths {
         patch: operations["resolve"];
         trace?: never;
     };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_5"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -523,7 +555,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         post?: never;
         delete?: never;
@@ -539,7 +571,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         post?: never;
         delete?: never;
@@ -735,6 +767,19 @@ export interface components {
             /** Format: int32 */
             delayMonths?: number;
         };
+        NotificationView: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            type?: "BUDGET_THRESHOLD" | "ANOMALY" | "IMPORT_COMPLETED";
+            title?: string;
+            body?: string;
+            link?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            readAt?: string;
+        };
         GoalContribution: {
             /** Format: uuid */
             goalId: string;
@@ -924,13 +969,14 @@ export interface components {
             truncated?: boolean;
         };
         JsonNode: {
+            number?: boolean;
+            valueNode?: boolean;
+            container?: boolean;
+            missingNode?: boolean;
             /** @enum {string} */
             nodeType?: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
             string?: boolean;
             integralNumber?: boolean;
-            missingNode?: boolean;
-            valueNode?: boolean;
-            container?: boolean;
             pojo?: boolean;
             short?: boolean;
             int?: boolean;
@@ -943,7 +989,6 @@ export interface components {
             boolean?: boolean;
             binary?: boolean;
             floatingPointNumber?: boolean;
-            number?: boolean;
             empty?: boolean;
             array?: boolean;
             null?: boolean;
@@ -1475,6 +1520,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AffordabilityResult"];
+                };
+            };
+        };
+    };
+    markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationView"];
                 };
             };
         };
@@ -2061,6 +2128,28 @@ export interface operations {
             };
         };
     };
+    list_5: {
+        parameters: {
+            query?: {
+                unreadOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationView"][];
+                };
+            };
+        };
+    };
     me: {
         parameters: {
             query?: never;
@@ -2259,7 +2348,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: {
                 status?: "OPEN" | "DISMISSED" | "EXPECTED";
@@ -2282,7 +2371,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;

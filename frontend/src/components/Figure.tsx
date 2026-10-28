@@ -10,7 +10,7 @@ export function Figure({ text, className = '' }: { text: string; className?: str
     <span className={className}>
       <span aria-hidden>
         {whole}
-        <span className="text-[0.55em] tracking-normal opacity-55">{fraction}</span>
+        <span className="text-[0.55em] tracking-normal opacity-70">{fraction}</span>
       </span>
       <span className="sr-only">{text}</span>
     </span>

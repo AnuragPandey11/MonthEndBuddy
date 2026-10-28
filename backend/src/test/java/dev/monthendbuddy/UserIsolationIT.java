@@ -61,12 +61,12 @@ class UserIsolationIT extends IntegrationTest {
 
 	/** Resources owned by user A. */
 	record Fixture(String token, String transactionId, String categoryId, String ruleId, String importId,
-			String budgetId, String goalId, String alertId, String conversationId) {
+			String budgetId, String goalId, String alertId, String conversationId, String notificationId) {
 
 		/** Text and IDs that only the owner's data contains; none may appear in anything the intruder gets. */
 		List<String> markers() {
 			return List.of("Owner's purchase", "Owner only", "Owner goal", "Owner splurge", transactionId, categoryId,
-					budgetId, goalId, alertId);
+					budgetId, goalId, alertId, notificationId);
 		}
 
 	}
@@ -110,6 +110,7 @@ class UserIsolationIT extends IntegrationTest {
 				new IsolationCase("DELETE", "/api/v1/goals/{id}", Fixture::goalId, f -> null),
 				new IsolationCase("POST", "/api/v1/goals/{id}/projection", Fixture::goalId, f -> null),
 				new IsolationCase("PATCH", "/api/v1/alerts/{id}", Fixture::alertId, f -> Map.of("status", "DISMISSED")),
+				new IsolationCase("POST", "/api/v1/notifications/{id}/read", Fixture::notificationId, f -> null),
 				new IsolationCase("GET", "/api/v1/agent/conversations/{id}", Fixture::conversationId, f -> null),
 				new IsolationCase("DELETE", "/api/v1/agent/conversations/{id}", Fixture::conversationId, f -> null));
 	}
@@ -174,8 +175,9 @@ class UserIsolationIT extends IntegrationTest {
 			.json()
 			.get("conversationId")
 			.asString();
+		String notificationId = asOwner.get("/api/v1/notifications").json().get(0).get("id").asString();
 		owner = new Fixture(ownerToken, transactionId, categoryId, ruleId, importId, budgetId, goalId, alertId,
-				conversationId);
+				conversationId, notificationId);
 		intruderToken = api().register().accessToken();
 		intruderId = new UserId(java.util.UUID
 			.fromString(api().bearer(intruderToken).get("/api/v1/me").json().get("id").asString()));
@@ -284,6 +286,7 @@ class UserIsolationIT extends IntegrationTest {
 		assertThat(intruder.get("/api/v1/budgets").json()).isEmpty();
 		assertThat(intruder.get("/api/v1/goals").json()).isEmpty();
 		assertThat(intruder.get("/api/v1/alerts").json()).isEmpty();
+		assertThat(intruder.get("/api/v1/notifications").json()).isEmpty();
 		assertThat(intruder.get("/api/v1/budgets/status").json().get("budgets")).isEmpty();
 		// The owner's rule must not categorise the intruder's transactions.
 		assertThat(intruder.post("/api/v1/transactions", TransactionFixtures.transaction("EXPENSE", "5",

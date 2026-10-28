@@ -7,6 +7,7 @@ import { createQueryClient } from '../../lib/queryClient'
 import { tokenStore } from '../../lib/auth/tokenStore'
 import { AuthProvider } from './AuthProvider'
 import { LoginPage } from './LoginPage'
+import { expectNoSeriousA11yViolations } from '../../test/axe'
 
 function renderLogin() {
   const router = createMemoryRouter(
@@ -33,6 +34,18 @@ describe('LoginPage', () => {
   afterEach(() => {
     tokenStore.set(null)
     vi.unstubAllGlobals()
+  })
+
+  it('has no serious accessibility violations, with its errors showing too', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => respond(401, { code: 'invalid_token' })),
+    )
+    renderLogin()
+    await expectNoSeriousA11yViolations()
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByText('Enter your email')
+    await expectNoSeriousA11yViolations()
   })
 
   it('validates before calling the API', async () => {

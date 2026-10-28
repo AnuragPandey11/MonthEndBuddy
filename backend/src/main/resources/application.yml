@@ -17,6 +17,29 @@ spring:
       hibernate.order_inserts: true
   flyway:
     locations: classpath:db/migration
+  # Redis and Kafka are used only when the meb.* switches turn them on (the full stack, architecture §11-12); with the
+  # core defaults nothing connects to them.
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      # Fail fast: with Redis down, a request should lose milliseconds, not seconds (P5 exit check).
+      timeout: 250ms
+      connect-timeout: 250ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # The relay waits for every in-sync replica, and the idempotent producer never writes a retried send twice
+    # (architecture §12.2). Envelopes are JSON strings, keyed by user id.
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+    consumer:
+      # A new consumer group starts from the oldest retained event, so nothing published before it joined is lost.
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
   servlet:
     multipart:
       # CSV statements: 5 MB per file (architecture §8.2); larger uploads get 413.
@@ -60,7 +83,12 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,db
+          # The full stack adds kafka when events go through Kafka (infra/env/full.env). Redis never gates
+          # readiness: it is optional and fails open (architecture §11).
+          include: ${MEB_READINESS_INCLUDE:readinessState,db}
+  health:
+    redis:
+      enabled: false
 
 logging:
   structured:
@@ -76,11 +104,22 @@ meb:
     refresh-cookie-secure: true
   events:
     mode: ${MEB_EVENTS_MODE:in-process}
+    # kafka mode: how often OutboxRelay sends the outbox.
+    relay-interval: 500ms
+  # Redis keys are meb:{env}:... (architecture §11.1).
+  env: ${MEB_ENV:local}
   cache:
     enabled: ${MEB_CACHE_ENABLED:false}
+    key-prefix: meb:${meb.env}
+    ttl: 10m
+    jitter: 60s
   agent:
     # groq = the real provider; scripted = canned replies (tests and the offline demo).
     provider: ${MEB_AGENT_PROVIDER:groq}
+    # With provider=scripted: true answers every question with one real tool call and a fixed reply after the delay
+    # (the offline demo, and the P4.5 streaming check through nginx). Off by default and in tests.
+    scripted-demo: ${MEB_AGENT_SCRIPTED_DEMO:false}
+    scripted-demo-delay: 2s
     max-tool-iterations: 6
     max-tool-calls-per-turn: 8
     model-timeout: 20s

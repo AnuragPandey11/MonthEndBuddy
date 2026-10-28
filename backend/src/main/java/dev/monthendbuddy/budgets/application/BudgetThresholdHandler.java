@@ -57,6 +57,11 @@ class BudgetThresholdHandler extends IdempotentHandler {
 	}
 
 	@Override
+	public Set<Class<? extends DomainEvent>> eventTypes() {
+		return Set.of(TransactionCreated.class, TransactionUpdated.class, TransactionDeleted.class, TransactionsImported.class);
+	}
+
+	@Override
 	protected String consumerName() {
 		return "meb-analytics.budget";
 	}

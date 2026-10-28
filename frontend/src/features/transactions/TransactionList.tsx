@@ -72,7 +72,7 @@ export function TransactionList({ transactions, onSelect }: Props) {
       columns={columns}
       rowKey={(t) => t.id}
       onSelect={onSelect}
-      selectLabel={(t) => `Edit ${t.description}`}
+      selectVerb="Edit"
     />
   )
 }
