@@ -6,6 +6,7 @@ import { currentMonth } from '../../lib/months'
 import { todayIso } from '../../lib/dates'
 import { formatMoney } from '../../lib/money'
 import { CopilotPage } from './CopilotPage'
+import { expectNoSeriousA11yViolations } from '../../test/axe'
 import type { AgentResponse, AgentStatus, Evidence } from './types'
 
 const month = currentMonth(todayIso())
@@ -100,6 +101,15 @@ describe('CopilotPage', () => {
     expect(within(card).getByText(/87 transactions/)).toBeInTheDocument()
     expect(screen.getByText('₹23,749.50', { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText(/not financial advice/)).toBeInTheDocument()
+  })
+
+  it('has no serious accessibility violations, empty and with an answer', async () => {
+    renderCopilot(response())
+    await screen.findByRole('button', { name: /new conversation/i })
+    await expectNoSeriousA11yViolations()
+    await askSomething()
+    await screen.findByRole('article', { name: 'Monthly summary' })
+    await expectNoSeriousA11yViolations()
   })
 
   it('evidence cards show only values present in the result', async () => {

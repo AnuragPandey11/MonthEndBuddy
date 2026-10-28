@@ -2,10 +2,12 @@ import { createBrowserRouter } from 'react-router'
 import { RedirectIfAuthenticated, RequireAuth } from '../features/auth/RouteGuards'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { AppShell } from './AppShell'
+import { HydrateFallback } from './HydrateFallback'
 
 // Pages load on demand, so the first paint ships only the shell and the current page.
 export const router = createBrowserRouter([
   {
+    HydrateFallback,
     element: <RedirectIfAuthenticated />,
     children: [
       {
@@ -19,6 +21,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
+    HydrateFallback,
     element: <RequireAuth />,
     children: [
       {

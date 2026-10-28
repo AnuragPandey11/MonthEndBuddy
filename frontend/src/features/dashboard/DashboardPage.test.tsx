@@ -5,6 +5,7 @@ import { emptyCoverage, inr, renderPage } from '../../test/render'
 import { currentMonth } from '../../lib/months'
 import { todayIso } from '../../lib/dates'
 import { DashboardPage } from './DashboardPage'
+import { expectNoSeriousA11yViolations } from '../../test/axe'
 
 const month = currentMonth(todayIso())
 const coverage = {
@@ -141,6 +142,12 @@ describe('DashboardPage', () => {
     await userEvent.click(within(cashFlow).getByRole('button', { name: /table/i }))
     const rows = within(cashFlow).getAllByRole('row')
     expect(rows[1]).toHaveTextContent('May 2026No dataNo data—')
+  })
+
+  it('has no serious accessibility violations', async () => {
+    renderPage(<DashboardPage />, routes)
+    await screen.findByText('Over budget')
+    await expectNoSeriousA11yViolations()
   })
 
   it('resolves an alert through the API', async () => {

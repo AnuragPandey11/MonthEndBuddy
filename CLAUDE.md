@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-**Phases 1 and 2 complete**: identity, transactions, CSV import, analytics, budgets, goals, affordability, anomaly alerts, demo data, and the dashboard and finance pages. **Phase 3 complete**: the AI agent, with the tool loop, nine tools, the copilot page and the eval set. `gpt-oss-120b` passed the live gate at 10/11. **Phase 4 in progress:** P4.1 (SSE streaming), P4.2 (design system and layout), P4.3 (motion, with the light bento restyle) and P4.3a (savings clarity and the month-end review) are done; next is P4.4 (shader). Progress is tracked in `docs/implementation-plan.md`; each work item heading carries its status. MonthEndBuddy is an AI-powered personal finance app: a Spring Boot modular monolith, a React SPA, PostgreSQL, optional Redis and Kafka, and an LLM agent on Groq that calls tools. GitHub: `AnuragPandey11/MonthEndBuddy`, default branch `main`.
+**Phases 1 and 2 complete**: identity, transactions, CSV import, analytics, budgets, goals, affordability, anomaly alerts, demo data, and the dashboard and finance pages. **Phase 3 complete**: the AI agent, with the tool loop, nine tools, the copilot page and the eval set. `gpt-oss-120b` passed the live gate at 10/11. **Phase 4 complete:** SSE streaming, the design system, motion and the light bento restyle, the month-end review, the aurora shader and the accessibility pass; its exit check passed on 2026-10-28. **Phase 5 complete:** the Compose `full` stack, the Redis cache, rate limits and turn lock, the outbox and Kafka, and notifications; its exit check passed on 2026-10-28. **Next is Phase 6** (P6.1, end-to-end tests). Progress is tracked in `docs/implementation-plan.md`; each work item heading carries its status. MonthEndBuddy is an AI-powered personal finance app: a Spring Boot modular monolith, a React SPA, PostgreSQL, optional Redis and Kafka, and an LLM agent on Groq that calls tools. GitHub: `AnuragPandey11/MonthEndBuddy`, default branch `main`.
 
 | Document | Role |
 |---|---|
@@ -39,14 +39,19 @@ Both docs under `docs/` are longer than a single Read returns (about 1,100 and 1
 
 - Compose (`compose.yaml` at the **repo root**, so it reads the root `.env`):
   - `docker compose up --build` runs the whole app on :8080 and needs `JWT_SECRET` in `.env`.
+  - `MEB_STACK=full COMPOSE_PROFILES=full docker compose up --build` runs the `full` stack (Redis and Kafka, see below). Add `tools` to `COMPOSE_PROFILES` for kafka-ui on :8085.
+  - Never run `docker compose down -v`: the postgres volume holds real data. Use `stop`.
   - `docker compose up -d postgres` runs only the database: PostgreSQL 17 on **host port 5433**, because a local PostgreSQL may already hold 5432. The backend's defaults match it.
   - Bind mounts from `~/Desktop` fail on Docker Desktop for macOS, so config is baked into images instead. The frontend image gets `infra/nginx/default.conf` through the `infra` build context.
 - With the `local` profile, logs are plain text and Swagger UI is at `http://localhost:8081/swagger-ui.html`. Otherwise logs are ECS JSON and the API docs are off.
 - Integration tests extend `support/IntegrationTest`, which provides one cached context with a random API port and a random management port.
 - `ModularityTests` enforces the `allowedDependencies` declared in each module's `package-info.java`. Change those declarations only together with architecture §4.1.
 - **Every new endpoint that takes the ID of a user-owned resource needs a row in `UserIsolationIT.cases()`, and every new copilot tool needs one in `UserIsolationIT.toolCases()`.** Their coverage guards fail the build otherwise.
-- Shared test helpers live in `src/test/java/dev/monthendbuddy/support/` (`ApiClient`, `MutableClock`, `IntegrationTest`) and `transactions/TransactionFixtures`.
+- Shared test helpers live in `src/test/java/dev/monthendbuddy/support/` (`ApiClient`, `MutableClock`, `IntegrationTest`, `RedisIntegrationTest`, `KafkaIntegrationTest`, `KafkaTestEvents`) and `transactions/TransactionFixtures`.
+- Tests that read what an event handler did call `awaitEventsHandled()` after the write. It does nothing in-process; in Kafka mode it waits for the relay and every consumer group.
+- Handler tests run in both event modes: an abstract `*Scenario` base with an in-process `*IT` and a `*KafkaIT` subclass. A Kafka subclass that can't extend `KafkaIntegrationTest` repeats its two annotations exactly, so all Kafka tests share one context.
 - Agent tests run against `ScriptedLlmGateway`: the `test` profile sets `meb.agent.provider=scripted`. Autowire it, call `reset()`, and queue replies with `thenReply` or `then(request -> …)`.
+- The offline copilot: `MEB_AGENT_PROVIDER=scripted MEB_AGENT_SCRIPTED_DEMO=true docker compose up --build` answers every question with one real tool call and a fixed reply after 2 s, with no AI provider. It is off by default and in tests. Its turns still count against the shared provider budget, about two a minute.
 - The live model eval is `GROQ_API_KEY=… ./mvnw verify -PaiEval`. It runs only `AiEvalLiveIT` and writes `target/ai-eval/report.md`. The key comes from the environment, and the run never happens in CI. Its pass bar is in `docs/ai-evaluation.md`; don't change it to fit a result. `AiEvalScriptedIT` runs the same cases on every build.
 - Planned, not built yet:
   - `-Pdependency-check`;
@@ -64,9 +69,9 @@ Both docs under `docs/` are longer than a single Read returns (about 1,100 and 1
 - TypeScript is pinned to 5.9.x on purpose: `typescript-eslint` and `openapi-typescript` don't support 6 or 7 yet.
 - `src/lib/api/schema.d.ts` is generated; never edit it by hand. `src/lib/api/types.ts` narrows it.
 - The browser never does arithmetic on money: `lib/money.ts` only formats the API's decimal strings.
-- Compose profiles (`full` and `tools` arrive in P5.1) are:
-  - `core` (default): postgres, backend and frontend. The flags come from `infra/env/core.env`: cache off, in-process events, in-memory rate limits. It is sufficient through Phase 4.
-  - `full`: core plus redis and kafka, with the cache enabled, `events.mode=kafka` and `ratelimit.mode=redis`.
+- Compose profiles are:
+  - `core` (default): postgres, backend and frontend. The flags come from `infra/env/core.env`: cache off, in-process events, in-memory rate limits.
+  - `full`: core plus redis and kafka, with the cache enabled, `events.mode=kafka` and `ratelimit.mode=redis`. The backend reads `infra/env/${MEB_STACK}.env`, so set both `MEB_STACK=full` and `COMPOSE_PROFILES=full`.
   - `tools`: adds kafka-ui, plus Prometheus and Grafana if those are added.
 - Ports: nginx `:8080` serves the SPA and proxies `/api` to the backend. The API is on `:8081`. Actuator is on `:8082`, which nginx does not proxy. The Vite dev server proxies `/api` the same way, so the setup is same-origin and needs no CORS.
 
@@ -121,7 +126,9 @@ These rules come from several sections of the docs. Each one is a design decisio
 **Events, cache and persistence (arch §11–12, D9–D11)**
 - `EventPublisher` is chosen by `meb.events.mode`. `in-process` uses `@TransactionalEventListener(AFTER_COMMIT)`. `kafka` writes an outbox row in the caller's transaction, which `OutboxRelay` then sends to Kafka.
 - Both modes use the same handler classes, and every handler extends `IdempotentHandler`, which uses the `processed_events` table.
-- **Kafka is not introduced before Phase 5.**
+- The outbox is `V11`, notifications `V12`. Topics are declared by the app (the broker doesn't auto-create them): each module declares its `EventType` beans in its `events` package, so `common` imports no module classes.
+- Handlers declare `eventTypes()`; a handler's consumer group is its `consumerName()` before the first dot. `IdempotentHandler` methods the Kafka consumer calls must not be `final`, because the handlers are CGLIB proxies.
+- `EventCodec` writes decimals as strings and `Money` at storage scale. Don't use `Money.toApiString()` in events, because it drops precision.
 - Redis is optional and fails open. The cache is invalidated by generation: `INCR` a per-user generation in `afterCommit` on any write.
 - Readers must read the generation **before** querying the DB. Only aggregates are cached; transaction rows and agent content never are.
 - Schema changes go only through Flyway (`V1__identity.sql`, `V2__transactions.sql`, …), and Hibernate runs with `ddl-auto=validate`.
@@ -134,7 +141,7 @@ These rules come from several sections of the docs. Each one is a design decisio
 - The copilot draws evidence cards from `evidence[].result` through a registry keyed by tool name.
 - Respect `prefers-reduced-motion`. Wrap the app in `<MotionConfig reducedMotion="user">`.
 - Never count-up animate financial figures.
-- Style with the design tokens in `styles.css` `@theme`, such as `rounded-card`, `text-title`, `p-card` and `shadow-overlay`, and the primitives in `components/` (`Card`, `CardHeader`, `Chip`, `Figure`, `PageHeader`, `DataList`, `Popover`, `buttonClass`), not raw values. Animate with the tokens in `lib/motion.ts`, and prefer transforms, so reduced motion turns them off. Vitest runs with `css: false`, so a misspelt utility fails silently. Grep the built CSS for any new token class.
+- Style with the design tokens in `styles.css` `@theme`, such as `rounded-card`, `text-title`, `p-card` and `shadow-overlay`, and the primitives in `components/` (`Card`, `CardHeader`, `Chip`, `Figure`, `PageHeader`, `DataList`, `Popover`, `buttonClass`), not raw values. Animate with the tokens in `lib/motion.ts`, and prefer transforms, so reduced motion turns them off. Vitest runs with `css: false`, so a misspelt utility fails silently. Grep the built CSS for any new token class. `styles.contrast.test.ts` checks every token pair's WCAG contrast, and component tests call `expectNoSeriousA11yViolations` (`test/axe.ts`).
 - The WebGL shader appears only in the hero card and the copilot header, with a CSS-gradient fallback. Text never sits directly on the shader.
 
 ## Verify before implementing

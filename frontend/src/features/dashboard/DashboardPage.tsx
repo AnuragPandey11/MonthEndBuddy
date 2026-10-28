@@ -25,6 +25,7 @@ import { CategoryBars } from '../../components/charts/CategoryBars'
 import { GoalGauge } from '../../components/charts/GoalGauge'
 import { PixelGrid } from '../../components/charts/PixelGrid'
 import { ShareBar } from '../../components/charts/ShareBar'
+import { AuroraBackground } from '../../components/aurora/AuroraBackground'
 import { Figure } from '../../components/Figure'
 import { Meter } from '../../components/Meter'
 import { MonthPicker } from '../../components/MonthPicker'
@@ -270,7 +271,7 @@ export function DashboardPage() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search"
-                    className="w-56 rounded-pill border border-line bg-surface py-2 pr-3 pl-9 text-sm placeholder:text-faint focus:border-accent focus:outline-none"
+                    className="w-56 rounded-pill border border-line bg-surface py-2 pr-3 pl-9 text-sm placeholder:text-faint focus:border-accent"
                   />
                 </label>
                 <Link to="/transactions" className={roundLink} aria-label="All transactions">
@@ -385,8 +386,12 @@ function HeroCard({
             </p>
           </div>
           {trends && trends.length > 0 && (
-            <div className="hidden sm:block">
-              <PixelGrid points={trends} />
+            // The aurora sits behind the pixel chart only: no text is ever drawn on the shader.
+            <div className="relative hidden overflow-hidden rounded-[1.25rem] p-3 sm:block">
+              <AuroraBackground />
+              <div className="relative">
+                <PixelGrid points={trends} />
+              </div>
             </div>
           )}
         </div>
@@ -434,7 +439,7 @@ function GoalPanel({ goals }: { goals: ReturnType<typeof useGoals> }) {
       {goals.isPending ? (
         <Skeleton className="h-48 bg-on-night/10" />
       ) : goals.isError ? (
-        <p className="py-10 text-center text-sm text-on-night/70">We couldn't load goals.</p>
+        <p className="py-10 text-center text-sm text-on-night/80">We couldn't load goals.</p>
       ) : !goal ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center">
           <p className="font-medium">No goals yet</p>
@@ -446,17 +451,17 @@ function GoalPanel({ goals }: { goals: ReturnType<typeof useGoals> }) {
         <>
           <div className="flex items-start justify-between gap-2">
             <p className="truncate text-sm font-medium">{goal.name}</p>
-            <p className="shrink-0 text-xs text-on-night/60">By {formatDate(goal.targetDate)}</p>
+            <p className="shrink-0 text-xs text-on-night/75">By {formatDate(goal.targetDate)}</p>
           </div>
           <div className="relative mx-auto mt-1 max-w-60">
             <GoalGauge pct={goal.progressPct} />
             <div className="absolute inset-x-0 top-[38%] text-center">
-              <p className="text-xs text-on-night/60">Saved</p>
+              <p className="text-xs text-on-night/75">Saved</p>
               <Figure
                 text={formatMoney(goal.current)}
                 className="block text-2xl font-semibold tracking-tight"
               />
-              <p className="text-xs text-on-night/60">
+              <p className="text-xs text-on-night/75">
                 of {formatMoney(goal.target)} · {goal.progressPct}%
               </p>
             </div>

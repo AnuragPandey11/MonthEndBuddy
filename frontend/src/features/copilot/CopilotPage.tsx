@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { AlertTriangle, Bot, Clock, Plus, Send, Trash2 } from 'lucide-react'
 import { AssumptionChips } from '../../components/AssumptionChips'
+import { AuroraBackground } from '../../components/aurora/AuroraBackground'
 import { Button } from '../../components/Button'
 import { TextArea } from '../../components/Field'
 import { ErrorState, Skeleton } from '../../components/States'
@@ -122,7 +123,7 @@ export function CopilotPage() {
   const lastKey = turns.at(-1)?.key
 
   return (
-    <section className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <section className="grid grid-cols-1 gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <aside className="order-2 flex flex-col gap-2 lg:order-1" aria-label="Conversations">
         <Button variant="secondary" onClick={startNew}>
           <Plus className="size-4" aria-hidden /> New conversation
@@ -160,7 +161,11 @@ export function CopilotPage() {
 
       <div className="order-1 flex min-w-0 flex-col gap-4 lg:order-2">
         <header className="stripes flex items-center gap-4 rounded-card border border-line/70 bg-surface p-5 shadow-card">
-          <img src="/logo-mark.png" alt="" width={56} height={56} className="size-14 shrink-0" />
+          {/* The aurora glows behind the robot tile only; the heading and text sit on the plain card. */}
+          <span className="relative inline-flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl">
+            <AuroraBackground />
+            <img src="/logo-mark.png" alt="" width={52} height={52} className="relative size-13" />
+          </span>
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-title">
               <Bot className="size-5" aria-hidden /> Copilot
@@ -324,7 +329,7 @@ function Answer({
         </div>
       )}
       {r.evidence.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {r.evidence.map((e) => (
             <EvidenceCard key={e.toolCallId} evidence={e} asOf={asOf} />
           ))}

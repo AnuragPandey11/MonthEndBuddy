@@ -15,13 +15,14 @@ import {
   Sparkles,
   Sun,
   Target,
+  TriangleAlert,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Logo } from '../components/Logo'
 import { Popover } from '../components/Popover'
-import { AlertList } from '../features/alerts/AlertList'
 import { useAuth } from '../features/auth/useAuth'
-import { useAlerts } from '../lib/api/finance'
+import { useMarkNotificationRead, useNotifications } from '../lib/api/finance'
+import type { Notification } from '../lib/api/types'
 import { duration, ease } from '../lib/motion'
 import { useTheme } from '../lib/theme'
 
@@ -154,14 +155,14 @@ export function AppShell() {
   )
 }
 
+/** Decorative initials, drawn by CSS (`.avatar-initials`), so they are not text the account button's name must hold. */
 function Avatar({ name }: { name: string }) {
   return (
     <span
-      className="inline-flex size-9 shrink-0 items-center justify-center rounded-pill bg-lime text-xs font-semibold text-on-lime"
+      className="avatar-initials inline-flex size-9 shrink-0 items-center justify-center rounded-pill bg-lime text-xs font-semibold text-on-lime"
+      data-initials={initials(name)}
       aria-hidden
-    >
-      {initials(name)}
-    </span>
+    />
   )
 }
 
@@ -228,22 +229,35 @@ function QuickAdd() {
   )
 }
 
-/** Open anomaly alerts (architecture §9.5). A failed load only hides the count: the shell never shows an error. */
+const NOTIFICATION_ICONS: Record<Notification['type'], LucideIcon> = {
+  BUDGET_THRESHOLD: PiggyBank,
+  ANOMALY: TriangleAlert,
+  IMPORT_COMPLETED: FileUp,
+}
+
+const notificationDate = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' })
+
+/**
+ * In-app notifications (P5.5): budget thresholds, unusual spending and finished imports, newest first. Opening one
+ * marks it read and goes to its page. A failed load only hides the count: the shell never shows an error.
+ */
 function Notifications() {
-  const alerts = useAlerts()
-  const open = alerts.data ?? []
+  const notifications = useNotifications()
+  const markRead = useMarkNotificationRead()
+  const all = notifications.data ?? []
+  const unread = all.filter((n) => n.readAt === null).length
   return (
     <Popover
-      label={open.length > 0 ? `Notifications, ${open.length} open` : 'Notifications'}
+      label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
       trigger={
         <>
           <Bell className="size-[1.125rem]" aria-hidden />
-          {open.length > 0 && (
+          {unread > 0 && (
             <span
               className="absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-pill bg-negative px-1 text-caption font-semibold text-surface"
               aria-hidden
             >
-              {open.length > 9 ? '9+' : open.length}
+              {unread > 9 ? '9+' : unread}
             </span>
           )}
         </>
@@ -251,17 +265,48 @@ function Notifications() {
       triggerClassName={iconButton}
     >
       <div className="flex flex-col gap-3 p-2">
-        <p className="text-sm font-semibold">Unusual spending</p>
-        {alerts.isPending ? (
+        <p className="text-sm font-semibold">Notifications</p>
+        {notifications.isPending ? (
           <p className="text-sm text-muted">Loading…</p>
-        ) : alerts.isError ? (
-          <p className="text-sm text-muted">We couldn't load your alerts.</p>
-        ) : open.length === 0 ? (
-          <p className="text-sm text-muted">Nothing unusual right now.</p>
+        ) : notifications.isError ? (
+          <p className="text-sm text-muted">We couldn't load your notifications.</p>
+        ) : all.length === 0 ? (
+          <p className="text-sm text-muted">Nothing new right now.</p>
         ) : (
-          <div className="max-h-80 overflow-y-auto">
-            <AlertList alerts={open} />
-          </div>
+          <ul className="-mx-1 flex max-h-80 flex-col gap-1 overflow-y-auto">
+            {all.map((n) => {
+              const Icon = NOTIFICATION_ICONS[n.type]
+              const isUnread = n.readAt === null
+              return (
+                <li key={n.id}>
+                  <Link
+                    to={n.link}
+                    className="flex gap-3 rounded-control px-1 py-2 hover:bg-elevated"
+                    onClick={() => isUnread && markRead.mutate(n.id)}
+                  >
+                    <Icon className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2">
+                        <span className={`text-sm ${isUnread ? 'font-semibold' : ''}`}>
+                          {n.title}
+                          {/* Spaces between the parts, so the link's accessible name reads as words. */}
+                          {isUnread && ' '}
+                          {isUnread && <span className="sr-only">(unread)</span>}
+                        </span>{' '}
+                        <span className="ml-auto shrink-0 text-xs text-faint">
+                          {notificationDate.format(new Date(n.createdAt))}
+                        </span>
+                      </span>{' '}
+                      <span className="mt-0.5 block text-sm text-muted">{n.body}</span>
+                    </span>
+                    {isUnread && (
+                      <span className="mt-1.5 size-2 shrink-0 rounded-pill bg-accent" aria-hidden />
+                    )}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
         )}
       </div>
     </Popover>
@@ -273,7 +318,7 @@ function ProfileMenu() {
   const [theme, setTheme] = useTheme()
   return (
     <Popover
-      label="Your account"
+      label={me ? `${me.displayName}, your account` : 'Your account'}
       trigger={
         me ? (
           <>

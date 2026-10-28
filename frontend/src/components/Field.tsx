@@ -8,7 +8,7 @@ import {
 
 const control =
   'w-full rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint ' +
-  'focus:border-accent focus:outline-none aria-[invalid=true]:border-negative'
+  'focus:border-accent aria-[invalid=true]:border-negative'
 
 interface FieldProps {
   label: string

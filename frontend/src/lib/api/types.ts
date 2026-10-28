@@ -199,6 +199,18 @@ export interface Alert {
   createdAt: string
 }
 
+/** An in-app notification (P5.5), created by the backend from a budget threshold, an anomaly or an import. */
+export interface Notification {
+  id: string
+  type: 'BUDGET_THRESHOLD' | 'ANOMALY' | 'IMPORT_COMPLETED'
+  title: string
+  body: string
+  /** An app path, e.g. `/budgets`. */
+  link: string
+  createdAt: string
+  readAt: string | null
+}
+
 export interface FieldViolationView {
   field: string
   message: string

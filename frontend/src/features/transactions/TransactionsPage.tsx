@@ -51,11 +51,11 @@ export function TransactionsPage() {
               className="inline-flex items-center gap-2 rounded-control border border-line-strong bg-elevated px-3.5 py-2 text-sm font-medium hover:border-faint"
             >
               <FileUp className="size-4" aria-hidden />
-              <span className="hidden sm:inline">Import CSV</span>
+              <span className="max-sm:sr-only">Import CSV</span>
             </Link>
             <Button onClick={() => setDialog({ open: true, transaction: null })}>
               <Plus className="size-4" aria-hidden />
-              <span className="hidden sm:inline">Add transaction</span>
+              <span className="max-sm:sr-only">Add transaction</span>
               <span className="sm:hidden">Add</span>
             </Button>
           </>

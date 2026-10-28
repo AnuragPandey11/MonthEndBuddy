@@ -199,7 +199,7 @@ function PinnedValues({
             ] as const
           ).map(([name, money, color]) => (
             <li key={name} className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-2 text-on-night/70">
+              <span className="flex items-center gap-2 text-on-night/80">
                 <span className={`size-2 rounded-pill ${color}`} aria-hidden />
                 {name}
               </span>
@@ -208,7 +208,7 @@ function PinnedValues({
           ))}
         </ul>
       ) : (
-        <p className="text-on-night/70">No transactions recorded</p>
+        <p className="text-on-night/80">No transactions recorded</p>
       )}
     </motion.div>
   )

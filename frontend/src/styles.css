@@ -14,15 +14,15 @@
   --color-elevated: #f3f4f6;
   --color-line: #e6e8ec;
   --color-line-strong: #d5d8de;
-  /* Text: ink for content, muted for labels, faint for metadata (4.5:1 on white). */
+  /* Text: ink for content, muted for labels, faint for metadata (all 4.5:1 on every surface; styles.contrast.test.ts). */
   --color-ink: #121316;
   --color-muted: #5b606c;
-  --color-faint: #717683;
+  --color-faint: #676b78;
   --color-accent: #2f5bf5;
   --color-accent-strong: #2448d8;
-  --color-positive: #15824a;
-  --color-negative: #d22f25;
-  --color-warning: #a2620a;
+  --color-positive: #11703f;
+  --color-negative: #bd281f;
+  --color-warning: #8f5607;
   --color-focus: #2f5bf5;
   /* The dark feature panel (the goal gauge, the active nav pill) in both themes, and the text on it. */
   --color-night: #1b1c20;
@@ -85,7 +85,7 @@
   --color-line-strong: #363940;
   --color-ink: #eceef2;
   --color-muted: #a3a8b4;
-  --color-faint: #848995;
+  --color-faint: #8b909c;
   --color-accent: #5b82ff;
   --color-accent-strong: #3f63e8;
   --color-positive: #3ecf8e;
@@ -122,8 +122,33 @@
 }
 
 /* The hatch for a month without data (missing data is not zero spending) and the copilot card's stripes. */
+/* The account avatar's initials: decoration, so not text that an accessible name must include. */
+.avatar-initials::before {
+  content: attr(data-initials);
+}
+
 .hatch {
   background-image: repeating-linear-gradient(135deg, var(--color-line-strong) 0 1px, transparent 1px 7px);
+}
+/* The aurora's fallback (P4.4): the shader's colours as still light, shown while it loads and when it cannot run. */
+.aurora-fallback {
+  background-color: var(--color-elevated);
+  background-image:
+    radial-gradient(
+      60% 80% at 15% 20%,
+      color-mix(in oklab, var(--color-accent) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50% 70% at 85% 30%,
+      color-mix(in oklab, var(--color-lime) 50%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      70% 60% at 60% 100%,
+      color-mix(in oklab, var(--color-series-income) 35%, transparent),
+      transparent 70%
+    );
 }
 .stripes {
   background-image: repeating-linear-gradient(

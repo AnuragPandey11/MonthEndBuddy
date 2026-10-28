@@ -3,21 +3,19 @@ import { Route, Routes } from 'react-router'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderPage } from '../test/render'
-import type { Alert } from '../lib/api/types'
+import type { Notification } from '../lib/api/types'
 import { AppShell } from './AppShell'
+import { expectNoSeriousA11yViolations } from '../test/axe'
 
-function alert(id: string, message: string): Alert {
+function notification(id: string, title: string, readAt: string | null = null): Notification {
   return {
     id,
-    ruleId: 'CATEGORY_SPIKE',
-    subjectType: 'CATEGORY',
-    subjectId: 'c1',
-    subjectLabel: 'Dining',
-    periodStart: '2026-10-01',
-    severity: 'WARNING',
-    status: 'OPEN',
-    message,
+    type: 'BUDGET_THRESHOLD',
+    title,
+    body: "You've spent ₹8,400.00 of a ₹10,000.00 budget in October 2026 (84%).",
+    link: '/settings',
     createdAt: '2026-10-20T10:00:00Z',
+    readAt,
   }
 }
 
@@ -31,9 +29,10 @@ function renderShell(routes: Record<string, unknown> = {}) {
       </Route>
     </Routes>,
     {
-      'GET /api/v1/alerts': [
-        alert('a1', 'Dining is up 80% on last month.'),
-        alert('a2', 'A large purchase.'),
+      'GET /api/v1/notifications': [
+        notification('n1', 'Budget 80% used'),
+        notification('n2', 'Unusual spending'),
+        notification('n3', 'Import complete', '2026-10-21T09:00:00Z'),
       ],
       'POST /api/v1/auth/logout': undefined,
       ...routes,
@@ -64,19 +63,40 @@ describe('AppShell', () => {
     expect(document.documentElement.dataset.theme).toBe('light')
   })
 
-  it('counts open alerts on the bell and lists them in its panel', async () => {
+  it('has no serious accessibility violations, with a panel open', async () => {
     renderShell()
-    const bell = await screen.findByRole('button', { name: 'Notifications, 2 open' })
+    await screen.findByRole('button', { name: 'Notifications, 2 unread' })
+    await expectNoSeriousA11yViolations()
+    await userEvent.click(screen.getByRole('button', { name: 'Asha, your account' }))
+    await expectNoSeriousA11yViolations()
+  })
+
+  it('counts unread notifications on the bell and lists them all in its panel', async () => {
+    renderShell()
+    const bell = await screen.findByRole('button', { name: 'Notifications, 2 unread' })
 
     await userEvent.click(bell)
 
-    const panel = screen.getByRole('dialog', { name: 'Notifications, 2 open' })
-    expect(within(panel).getByText('Dining is up 80% on last month.')).toBeInTheDocument()
+    const panel = screen.getByRole('dialog', { name: 'Notifications, 2 unread' })
+    expect(within(panel).getAllByRole('link')).toHaveLength(3)
+    expect(within(panel).getByRole('link', { name: /Budget 80% used \(unread\)/ })).toBeInTheDocument()
+    expect(within(panel).getByRole('link', { name: /^Import complete/ })).not.toHaveTextContent('(unread)')
     expect(bell).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('hides the count when alerts cannot be loaded, without an error in the shell', async () => {
-    renderShell({ 'GET /api/v1/alerts': () => new Response('{}', { status: 500 }) })
+  it('opening a notification marks it read and goes to its page', async () => {
+    const read = vi.fn(() => notification('n1', 'Budget 80% used', '2026-10-28T08:00:00Z'))
+    renderShell({ 'POST /api/v1/notifications/n1/read': read })
+    await userEvent.click(await screen.findByRole('button', { name: 'Notifications, 2 unread' }))
+
+    await userEvent.click(screen.getByRole('link', { name: /Budget 80% used/ }))
+
+    expect(await screen.findByText('Settings page')).toBeInTheDocument()
+    await waitFor(() => expect(read).toHaveBeenCalledOnce())
+  })
+
+  it('hides the count when notifications cannot be loaded, without an error in the shell', async () => {
+    renderShell({ 'GET /api/v1/notifications': () => new Response('{}', { status: 500 }) })
     await userEvent.click(await screen.findByRole('button', { name: 'Notifications' }))
     expect(screen.queryByRole('alert')).toBeNull()
   })
@@ -95,13 +115,15 @@ describe('AppShell', () => {
 
   it('closes a panel when one of its links navigates', async () => {
     renderShell()
-    await userEvent.click(screen.getByRole('button', { name: 'Your account' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Asha, your account' }))
     await userEvent.click(
-      within(screen.getByRole('dialog', { name: 'Your account' })).getByRole('link', { name: 'Settings' }),
+      within(screen.getByRole('dialog', { name: 'Asha, your account' })).getByRole('link', {
+        name: 'Settings',
+      }),
     )
 
     expect(await screen.findByText('Settings page')).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Your account' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Asha, your account' })).toBeNull()
   })
 
   it('closes a panel on a click outside it', async () => {
@@ -113,7 +135,7 @@ describe('AppShell', () => {
 
   it('signs out from the account menu', async () => {
     const fetchMock = renderShell()
-    await userEvent.click(await screen.findByRole('button', { name: 'Your account' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Asha, your account' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
     await waitFor(() =>

@@ -27,6 +27,8 @@
 		<bucket4j.version>8.21.0</bucket4j.version>
 		<commons-csv.version>1.14.1</commons-csv.version>
 		<postgres.image>postgres:17-alpine</postgres.image>
+		<redis.image>redis:7.4-alpine</redis.image>
+		<kafka.image>apache/kafka:4.2.2</kafka.image>
 	</properties>
 
 	<dependencies>
@@ -74,6 +76,21 @@
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j_jdk17-core</artifactId>
 			<version>${bucket4j.version}</version>
+		</dependency>
+		<!-- Phase 5 (architecture §11-12). Optional at runtime: every Redis and Kafka bean is behind meb.* switches, so
+		     the core stack (cache off, in-process events, in-memory limits) never connects to either. -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-lettuce</artifactId>
+			<version>${bucket4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
 		</dependency>
 		<!-- AI copilot: Groq through Spring AI's OpenAI-compatible client (ADR 0001). Only SpringAiLlmGateway uses it. -->
 		<dependency>
@@ -151,6 +168,16 @@
 			<artifactId>testcontainers-postgresql</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-kafka</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.awaitility</groupId>
+			<artifactId>awaitility</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<dependencyManagement>
@@ -185,6 +212,8 @@
 				<configuration>
 					<systemPropertyVariables>
 						<postgres.image>${postgres.image}</postgres.image>
+						<redis.image>${redis.image}</redis.image>
+						<kafka.image>${kafka.image}</kafka.image>
 					</systemPropertyVariables>
 				</configuration>
 				<executions>

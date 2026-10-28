@@ -800,6 +800,10 @@ Defence does not rely on the prompt alone:
 
 **Failure:** a Redis error is logged and counted (`meb.cache.errors`), and the request falls through to the DB (fail-open).
 
+**A failed bump must not leave a stale read.** If the `INCR` after a commit fails, the old generation's keys still hold pre-write figures. `RedisCacheGenerationService` therefore marks that user *stale* in a local Caffeine map for TTL + jitter (11 minutes). While a user is stale, reads skip the cache and go to the DB; the mark clears on the next successful bump or when it expires, by which time every old key has expired too. The mark is per instance, which is enough for the single backend in Compose.
+
+**As built (P5.2).** Lettuce runs with `REJECT_COMMANDS` while disconnected and 250 ms command and connect timeouts (`spring.data.redis.*`), so a Redis outage costs a request milliseconds, not seconds. Hits and misses are counted in `meb.cache.requests{result}`. Redis never gates readiness, and its health indicator is off.
+
 ### 11.2 Rate limiting
 
 | Bucket | Limit (configurable) | Key | On Redis outage |
@@ -812,9 +816,11 @@ Defence does not rely on the prompt alone:
 
 Implementation: Bucket4j with a Redis backend (Lettuce) or a Lua token bucket. Responses: `429` plus `Retry-After` plus a `ProblemDetail`.
 
+**As built (P5.3).** `RedisRateLimiter` uses Bucket4j's Lettuce proxy manager (`meb.ratelimit.mode=redis`). On a Redis error it retries once on a fresh connection, because a closed client (for example after the test framework pauses a cached context) otherwise fails every call; if that fails too it uses `InMemoryRateLimiter` and stops trying Redis for 2 seconds. Errors are counted in `meb.ratelimit.redis.errors`.
+
 ### 11.3 Short-lived state
 
-- Agent turn lock: `SET meb:…:agentlock:{conversationId} NX EX 60`.
+- Agent turn lock: `SET meb:…:agentlock:{conversationId} NX EX 60`. The value is a random token the holder keeps, and release is a Lua compare-and-delete, so a turn that outlived its 60 seconds cannot release a lock that another turn now holds. On a Redis error the lock falls back to the in-memory one.
 - Optional: an idempotency-key cache for `POST /transactions` (`Idempotency-Key` header, 24 h).
 
 ---
@@ -837,7 +843,7 @@ sequenceDiagram
     participant An as AnalyticsConsumer
     participant No as NotificationConsumer
     Svc->>DB: BEGIN · insert transaction · insert outbox_event · COMMIT
-    Relay->>DB: SELECT … WHERE published_at IS NULL<br/>ORDER BY occurred_at LIMIT 100 FOR UPDATE SKIP LOCKED
+    Relay->>DB: SELECT … WHERE published_at IS NULL<br/>ORDER BY seq LIMIT 100 FOR UPDATE SKIP LOCKED
     Relay->>K: send(topic, key=userId, envelope) acks=all, idempotent producer
     Relay->>DB: UPDATE published_at = now()
     K->>An: TransactionCreated
@@ -850,6 +856,14 @@ sequenceDiagram
 - Ordering is per user: events are keyed by `userId`, so each user's events land on one partition.
 - Published outbox rows are deleted after 7 days.
 - The Spring Modulith event publication registry with Kafka externalisation is an acceptable substitute for the hand-rolled relay. The hand-rolled version is chosen here because it shows the pattern explicitly.
+
+**As built (P5.4).**
+- `outbox_events` (`V11__outbox.sql`) orders the relay by a `bigserial seq`, not `occurred_at`: two events from one transaction can share a timestamp, but never a `seq`.
+- `OutboxEventPublisher` uses `Propagation.MANDATORY`, so a publish outside a transaction fails instead of being written on its own.
+- `OutboxRelay` sends each row synchronously and stamps the batch in the same transaction as the claim. A crash between the send and the stamp re-sends the rows on the next pass; consumers drop them through `processed_events`. Metrics: `meb.outbox.pending` (gauge) and `meb.outbox.publish.lag` (timer, commit to send).
+- `KafkaEventConsumer` builds one listener container per consumer group from Boot's container factory, subscribed to the topics of the events its handlers take. Each record is decoded once and given to every handler in the group that takes its type, **each in its own `REQUIRES_NEW` transaction**. A handler that succeeded skips the record when another handler's failure causes a retry.
+- Kafka mode publishes no Spring events, so the handlers' `@TransactionalEventListener` methods stay idle there; the in-process mode is unchanged.
+- The broker does not auto-create topics. The app declares every event topic (3 partitions) and its `.DLT` (1 partition) through `KafkaAdmin.NewTopics`. A `kafka` health indicator (`describeCluster`, 2 s timeout) joins the readiness group in the `full` stack.
 
 ### 12.3 Topics and envelope
 
@@ -869,14 +883,15 @@ sequenceDiagram
   "userId": "7f3…",
   "aggregateId": "tx-uuid",
   "traceId": "4bf9…",
-  "payload": { "transactionId": "…", "type": "EXPENSE", "amount": "8400.00", "currency": "INR", "categoryId": "…", "transactionDate": "2026-10-25" }
+  "payload": { "eventId": "…", "userId": "7f3…", "aggregateId": "tx-uuid", "type": "EXPENSE", "amount": { "amount": "8400.0000", "currency": "INR" }, "categoryId": "…", "transactionDate": "2026-10-25" }
 }
 ```
 
 - Payloads carry IDs and amounts only, never descriptions or notes. Consumers re-read anything else from PostgreSQL, which is the source of truth.
+- The payload is the event record itself. `EventCodec` writes every decimal as a string, and `Money` at storage scale (4 places), so values such as `84.50` and `8400.1234` read back exactly; the API's 2-place format would lose precision. Each module declares its event types (name, record, topic, version) as `EventType` beans in its `events` package, so `common` imports no module classes.
 - Schemas are JSON with a `schemaVersion` field. Consumers accept version N and N−1. Adding a field is compatible; removing or renaming one requires a new version.
 - **Retries:** Spring Kafka `DefaultErrorHandler` with exponential backoff (1 s → 2 s → 4 s, 3 attempts), then `DeadLetterPublishingRecoverer` to `.DLT`. Validation and deserialisation errors are marked non-retryable and go straight to the DLT.
-- **Consumer groups:** `meb-analytics` (anomaly and budget rules) and `meb-notifications`.
+- **Consumer groups:** `meb-analytics` (anomaly and budget rules) and `meb-notifications`. A handler's group is the part of its consumer name before the first dot (`meb-analytics.budget`, `meb-notifications.inbox`).
 
 ---
 
@@ -961,8 +976,8 @@ frontend/src/
   - Assumptions render as labelled chips (`Derived`, `You said`, `Default`).
   - `NEEDS_CLARIFICATION` shows the options as quick-reply chips.
   - `PROVIDER_UNAVAILABLE` shows a dedicated state that links to the dashboard.
-- **Shader** (`AuroraBackground`):
-  - Lazy-loaded and limited to the hero/balance card and the copilot header.
+- **Shader** (`AuroraBackground`, raw WebGL; [ADR 0002](adr/0002-aurora-shader-in-raw-webgl.md)):
+  - Lazy-loaded and limited to the hero/balance card and the copilot header: in practice, behind the hero's pixel chart and the copilot's robot tile, so text never sits on it.
   - Caps device pixel ratio at 1.5.
   - Pauses on `document.hidden` and when off-screen (IntersectionObserver).
   - Disposes GL resources on unmount.

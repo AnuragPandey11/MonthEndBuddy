@@ -2,6 +2,9 @@
 #   cp .env.example .env        # then set JWT_SECRET (see .env.example)
 #   docker compose up --build   # app on http://localhost:8080
 # Only the database, for backend development:  docker compose up -d postgres
+# The full stack (Redis cache and rate limits, Kafka events; architecture §3, §11-12):
+#   MEB_STACK=full COMPOSE_PROFILES=full docker compose up --build
+# Add kafka-ui on http://localhost:8085 with COMPOSE_PROFILES=full,tools.
 # The compose file lives at the root so that Compose reads the root .env for ${...} values.
 name: monthendbuddy
 
@@ -25,7 +28,8 @@ services:
 
   backend:
     build: ./backend
-    env_file: ./infra/env/core.env
+    # core (default) or full: the backend's feature flags (implementation plan I11).
+    env_file: ./infra/env/${MEB_STACK:-core}.env
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/monthendbuddy
       DB_USERNAME: ${DB_USERNAME:-monthendbuddy}
@@ -35,8 +39,66 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       AI_BASE_URL: ${AI_BASE_URL:-https://api.groq.com/openai/v1}
       AI_MODEL: ${AI_MODEL:-openai/gpt-oss-120b}
+      # groq (default) or scripted; scripted with MEB_AGENT_SCRIPTED_DEMO=true runs the copilot offline.
+      MEB_AGENT_PROVIDER: ${MEB_AGENT_PROVIDER:-groq}
+      MEB_AGENT_SCRIPTED_DEMO: ${MEB_AGENT_SCRIPTED_DEMO:-false}
     depends_on:
       postgres:
+        condition: service_healthy
+      # Only in the full profile; the core stack starts without them.
+      redis:
+        condition: service_healthy
+        required: false
+      kafka:
+        condition: service_healthy
+        required: false
+
+  redis:
+    profiles: [full]
+    image: redis:7.4-alpine
+    # A cache and rate-limit store only: nothing in it needs to survive a restart (architecture §11).
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    profiles: [full]
+    # Single-node KRaft (no ZooKeeper); the tag matches kafka-clients 4.2.2.
+    image: apache/kafka:4.2.2
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # The app creates its topics, with their partition counts (architecture §12.3).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      start_period: 20s
+      retries: 10
+
+  kafka-ui:
+    profiles: [tools]
+    image: kafbat/kafka-ui:v1.4.2
+    environment:
+      KAFKA_CLUSTERS_0_NAME: monthendbuddy
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "${KAFKA_UI_PORT:-8085}:8080"
+    depends_on:
+      kafka:
         condition: service_healthy
 
   frontend:

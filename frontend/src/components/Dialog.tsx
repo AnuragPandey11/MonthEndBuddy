@@ -11,7 +11,30 @@ interface DialogProps {
   children: ReactNode
 }
 
-/** Modal dialog: Escape and the backdrop close it; focus moves in on open and returns on close. */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** Keeps Tab and Shift+Tab inside the open dialog, wrapping at either end. */
+function trapFocus(event: KeyboardEvent, panel: HTMLElement | null) {
+  const focusable = [...(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])]
+  const first = focusable[0]
+  const last = focusable.at(-1)
+  if (!first || !last) return
+  const active = document.activeElement
+  const inside = panel?.contains(active) ?? false
+  if (event.shiftKey && (active === first || !inside)) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (active === last || !inside)) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+/**
+ * Modal dialog: Escape and the backdrop close it; focus moves in on open, stays inside while open (Tab and
+ * Shift+Tab wrap around), and returns on close.
+ */
 export function Dialog({ title, open, onClose, children }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null)
 
@@ -24,6 +47,7 @@ export function Dialog({ title, open, onClose, children }: DialogProps) {
     first?.focus()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
+      if (event.key === 'Tab') trapFocus(event, panel.current)
     }
     document.addEventListener('keydown', onKey)
     return () => {
