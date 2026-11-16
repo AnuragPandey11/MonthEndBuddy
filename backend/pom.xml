@@ -23,7 +23,7 @@
 		<spring-ai.version>2.0.2</spring-ai.version>
 		<resilience4j.version>2.4.0</resilience4j.version>
 		<springdoc.version>3.2.0</springdoc.version>
-		<bouncycastle.version>1.86</bouncycastle.version>
+		<bouncycastle.version>1.87</bouncycastle.version>
 		<bucket4j.version>8.21.0</bucket4j.version>
 		<commons-csv.version>1.14.1</commons-csv.version>
 		<postgres.image>postgres:17-alpine</postgres.image>
